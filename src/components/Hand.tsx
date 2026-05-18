@@ -1,5 +1,6 @@
 import { LayoutGroup, Reorder, motion } from 'framer-motion';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useMobileHandLayout } from '../hooks/useMobileHandLayout';
 import type { Card } from '../types/game';
 import { cardKey, isSameCard } from '../utils/cards';
 import { getCardFanStyle, HAND_FAN_OPTIONS } from '../utils/cardFan';
@@ -21,6 +22,10 @@ interface HandProps {
 
 const LAYOUT_SPRING = { type: 'spring' as const, stiffness: 420, damping: 34, mass: 0.82 };
 const DRAG_SPRING = { type: 'spring' as const, stiffness: 520, damping: 30, mass: 0.75 };
+
+const MOBILE_CARD_WIDTH = 72;
+const MOBILE_OVERLAP_MIN = -54;
+const MOBILE_OVERLAP_MAX = -20;
 
 interface HandCardProps {
   card: Card;
@@ -67,6 +72,20 @@ const HandCard: React.FC<HandCardProps> = ({
   </motion.div>
 );
 
+const computeMobileOverlap = (cardCount: number, viewportWidth: number): number => {
+  if (cardCount <= 1) {
+    return MOBILE_OVERLAP_MAX;
+  }
+  const padding = 28;
+  const target = Math.max(viewportWidth - padding, MOBILE_CARD_WIDTH + 40);
+  const natural = MOBILE_CARD_WIDTH + (cardCount - 1) * (MOBILE_CARD_WIDTH + MOBILE_OVERLAP_MAX);
+  if (natural <= target) {
+    return MOBILE_OVERLAP_MAX;
+  }
+  const overlap = (target - MOBILE_CARD_WIDTH) / (cardCount - 1) - MOBILE_CARD_WIDTH;
+  return Math.max(MOBILE_OVERLAP_MIN, Math.min(MOBILE_OVERLAP_MAX, overlap));
+};
+
 const Hand: React.FC<HandProps> = ({
   cards,
   selectedCards,
@@ -80,14 +99,34 @@ const Hand: React.FC<HandProps> = ({
   className,
 }) => {
   const [sortAnimating, setSortAnimating] = useState(false);
+  const [slotOverlap, setSlotOverlap] = useState(MOBILE_OVERLAP_MAX);
   const didDragRef = useRef(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isMobileHand = useMobileHandLayout();
 
   const hiddenSet = new Set(hiddenCards.map(cardKey));
   const visibleCards = cards.filter((c) => !hiddenSet.has(cardKey(c)));
-  const canReorder = !!onReorder;
+  const canReorder = !!onReorder && !isMobileHand;
 
   const isSelected = (card: Card) => selectedCards.some((s) => isSameCard(s, card));
   const isHighlighted = (card: Card) => highlightedCards.some((h) => isSameCard(h, card));
+
+  useLayoutEffect(() => {
+    if (!isMobileHand) {
+      return;
+    }
+    const el = viewportRef.current;
+    if (!el) {
+      return;
+    }
+    const update = () => {
+      setSlotOverlap(computeMobileOverlap(visibleCards.length, el.clientWidth));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobileHand, visibleCards.length]);
 
   useEffect(() => {
     if (!sortPulse || !layoutAnimation) {
@@ -111,12 +150,17 @@ const Hand: React.FC<HandProps> = ({
 
   const handClassName = [
     'hand',
+    isMobileHand ? 'hand--mobile' : '',
     sortAnimating ? 'hand--sorting' : '',
     !layoutAnimation ? 'hand--playing' : '',
     className ?? '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const handStyle = isMobileHand
+    ? ({ '--hand-slot-overlap': `${slotOverlap}px` } as React.CSSProperties)
+    : undefined;
 
   const layoutTransition = layoutAnimation ? LAYOUT_SPRING : { duration: 0 };
 
@@ -193,7 +237,10 @@ const Hand: React.FC<HandProps> = ({
     });
 
   return (
-    <div className="hand-viewport">
+    <motion.div
+      ref={viewportRef}
+      className={['hand-viewport', isMobileHand ? 'hand-viewport--mobile' : ''].filter(Boolean).join(' ')}
+    >
       <LayoutGroup>
         {canReorder ? (
           <Reorder.Group
@@ -202,14 +249,17 @@ const Hand: React.FC<HandProps> = ({
             values={visibleCards}
             onReorder={handleReorder}
             className={handClassName}
+            style={handStyle}
           >
             {renderSlots(true)}
           </Reorder.Group>
         ) : (
-          <motion.div className={handClassName}>{renderSlots(false)}</motion.div>
+          <motion.div className={handClassName} style={handStyle}>
+            {renderSlots(false)}
+          </motion.div>
         )}
       </LayoutGroup>
-    </div>
+    </motion.div>
   );
 };
 

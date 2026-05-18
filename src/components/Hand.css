@@ -4,7 +4,6 @@
   align-items: flex-end;
   justify-content: center;
   flex-wrap: nowrap;
-  /* overflow-x:auto fuerza recorte vertical; el scroll va en .hand-viewport */
   overflow: visible;
   padding: 0 24px 22px;
   min-height: 200px;
@@ -16,11 +15,9 @@
   width: 100%;
   max-width: 100%;
   overflow: visible;
-  /* Espacio reservado arriba para levantar/seleccionar cartas sin recorte */
   padding-top: 128px;
   margin-top: -76px;
   padding-bottom: 4px;
-  /* El margen negativo solapa los botones; dejar pasar clics fuera de las cartas */
   pointer-events: none;
 }
 
@@ -39,7 +36,7 @@
 }
 
 .hand__slot--overlap {
-  margin-left: -36px;
+  margin-left: var(--hand-slot-overlap, -36px);
 }
 
 .hand__slot:active {
@@ -67,13 +64,11 @@
   z-index: 60 !important;
 }
 
-/* Sin reflow ni ola al jugar (solo vuelo hacia la mesa) */
 .hand--playing .hand__card-wrapper {
   transition: none;
   animation: none !important;
 }
 
-/* Animación al pulsar ordenar (efecto ola en el abanico) */
 .hand--sorting .hand__card-wrapper {
   animation: hand-sort-pop 0.58s cubic-bezier(0.34, 1.25, 0.64, 1) both;
   animation-delay: calc(var(--idx) * 28ms);
@@ -95,5 +90,59 @@
   100% {
     transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(1);
     filter: brightness(1);
+  }
+}
+
+/* ── Móvil: scroll horizontal (sin drag-reorder en cartas) ─────────────── */
+
+.hand-viewport--mobile {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 12px;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.hand-viewport--mobile::-webkit-scrollbar {
+  display: none;
+}
+
+.hand-viewport--mobile .hand {
+  justify-content: flex-start;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 14px 16px;
+  min-height: 150px;
+  touch-action: pan-x;
+}
+
+.hand-viewport--mobile .hand__slot {
+  cursor: pointer;
+  touch-action: manipulation;
+  scroll-snap-align: center;
+}
+
+.hand-viewport--mobile .hand__slot:active {
+  cursor: pointer;
+}
+
+.hand--mobile .hand__card-wrapper {
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.1, 0.64, 1),
+    filter 0.2s ease;
+}
+
+.hand--mobile .card--hand {
+  width: 72px;
+  height: 110px;
+}
+
+@media (max-width: 380px) {
+  .hand--mobile .card--hand {
+    width: 64px;
+    height: 98px;
   }
 }

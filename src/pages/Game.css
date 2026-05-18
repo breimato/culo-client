@@ -154,6 +154,7 @@
   overflow: visible;
   width: 100%;
   min-height: 0;
+  max-width: 100vw;
 }
 
 .game--playing .hand {
