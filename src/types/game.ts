@@ -47,6 +47,7 @@ export interface RoomState {
   lastRankName: CardRankName | null;
   culoSwapInitiatorId: string | null;
   culoSwapTargetId: string | null;
+  exchangeDonePlayerIds?: string[];
 }
 
 export interface JoinedRoom {
@@ -59,6 +60,7 @@ export interface HandUpdate {
 }
 
 export interface PlayMade {
+  eventId?: string;
   playerId: string;
   cards: Card[];
   plin: boolean;
@@ -66,7 +68,20 @@ export interface PlayMade {
 }
 
 export interface RoundEnded {
+  eventId?: string;
   winnerPlayerId: string;
+}
+
+export interface QuadDiscarded {
+  eventId?: string;
+  playerId: string;
+  value: number;
+  cards: Card[];
+}
+
+export interface RoundReset {
+  eventId?: string;
+  reason: 'AS_OROS' | 'NO_RESPONSE' | 'MANUAL';
 }
 
 export interface RankingEntry {

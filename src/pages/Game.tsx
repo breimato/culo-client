@@ -6,14 +6,16 @@ import ExchangePanel from '../components/ExchangePanel';
 import FlyingPlayAnimation from '../components/FlyingPlayAnimation';
 import Hand from '../components/Hand';
 import PlinSplash from '../components/PlinSplash';
+import QuadDiscardSplash from '../components/QuadDiscardSplash';
 import PlayerSlot from '../components/PlayerSlot';
 import TablePile, { type TablePilePlay } from '../components/TablePile';
 import { useGameStore } from '../store/gameStore';
-import type { Card, PlayMade } from '../types/game';
+import type { Card, PlayMade, QuadDiscarded } from '../types/game';
 import { isSameCard } from '../utils/cards';
 import { isPlayLegal, isRoundOpen } from '../utils/gameRules';
 import { mergeHandOrder, sortHandByNumber, sortHandBySuit } from '../utils/handOrder';
 import {
+  sendAck,
   sendCuloSwapInitiate,
   sendCuloSwapVote,
   sendDealCards,
@@ -54,12 +56,21 @@ const Game: React.FC = () => {
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
   const [swapTarget, setSwapTarget] = useState<string | null>(null);
-  const [centerPlay, setCenterPlay] = useState<TablePilePlay | null>(null);
+  const [centerPile, setCenterPile] = useState<TablePilePlay[]>([]);
   const [flyingCards, setFlyingCards] = useState<Card[] | null>(null);
   const [hiddenFromHand, setHiddenFromHand] = useState<Card[]>([]);
   const [plinSplash, setPlinSplash] = useState<{ id: number; nick: string } | null>(null);
   const [orderedHand, setOrderedHand] = useState<Card[]>([]);
   const [sortPulse, setSortPulse] = useState(0);
+  const [quadDiscardShow, setQuadDiscardShow] = useState<{
+    id: number;
+    eventId?: string;
+    playerId: string;
+    playerNick: string;
+    value: number;
+    cards: Card[];
+  } | null>(null);
+  const [highlightedQuadCards, setHighlightedQuadCards] = useState<Card[]>([]);
 
   const cleanupRef = useRef<(() => void)[]>([]);
   const isFlyingRef = useRef(false);
@@ -67,6 +78,12 @@ const Game: React.FC = () => {
   const lastLocalPlayRef = useRef<Card[]>([]);
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
+  const lastPlayIsAsOrosRef = useRef(false);
+  const clearPileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quadQueueRef = useRef<QuadDiscarded[]>([]);
+  const isQuadAnimatingRef = useRef(false);
+  const pendingHandUpdateRef = useRef<Card[] | null>(null);
+  const quadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bumpPileKey = () => {
     pileKeyRef.current += 1;
@@ -76,8 +93,31 @@ const Game: React.FC = () => {
   const resolveNick = (pid: string) =>
     useGameStore.getState().roomState?.players.find((p) => p.id === pid)?.nick ?? '?';
 
-  const showTablePlay = useCallback((cards: Card[], playerNick: string) => {
-    setCenterPlay({ cards, playerNick, key: bumpPileKey() });
+  const clearPile = useCallback(() => {
+    if (clearPileTimerRef.current) {
+      clearTimeout(clearPileTimerRef.current);
+      clearPileTimerRef.current = null;
+    }
+    lastPlayIsAsOrosRef.current = false;
+    setCenterPile([]);
+  }, []);
+
+  const scheduleClearPile = useCallback((delayMs: number) => {
+    if (clearPileTimerRef.current) {
+      clearTimeout(clearPileTimerRef.current);
+    }
+    clearPileTimerRef.current = setTimeout(() => {
+      clearPileTimerRef.current = null;
+      lastPlayIsAsOrosRef.current = false;
+      setCenterPile([]);
+    }, delayMs);
+  }, []);
+
+  const showTablePlay = useCallback((cards: Card[], playerNick: string, isAsOros = false) => {
+    if (isAsOros) {
+      lastPlayIsAsOrosRef.current = true;
+    }
+    setCenterPile((prev) => [...prev, { cards, playerNick, key: bumpPileKey(), isAsOros }]);
   }, []);
 
   const showNotification = (msg: string) => {
@@ -99,13 +139,17 @@ const Game: React.FC = () => {
         showNotification(`${nick} jugó ${pm.cards.length} carta(s)${suffix}`);
       }
 
+      if (pm.eventId && clientId) {
+        sendAck(clientId, useGameStore.getState().roomCode ?? '', pm.eventId);
+      }
+
       if (pm.playerId === playerIdRef.current && isFlyingRef.current) {
         setFlyingCards([...lastLocalPlayRef.current]);
         return;
       }
-      showTablePlay(pm.cards, nick);
+      showTablePlay(pm.cards, nick, pm.isAsOros);
     },
-    [showTablePlay, showPlinSplash],
+    [showTablePlay, showPlinSplash, clientId],
   );
 
   const abortPendingPlay = useCallback(() => {
@@ -119,9 +163,72 @@ const Game: React.FC = () => {
     setFlyingCards(null);
     isFlyingRef.current = false;
     const myNick = resolveNick(playerIdRef.current ?? '');
-    showTablePlay(lastLocalPlayRef.current, myNick);
+    const cards = lastLocalPlayRef.current;
+    const isAsOros = cards.length === 1 && cards[0].number === 1 && cards[0].suit === 'OROS';
+    showTablePlay(cards, myNick, isAsOros);
     setHiddenFromHand([]);
   }, [showTablePlay]);
+
+  const beginQuadSplash = useCallback((qd: QuadDiscarded, nick: string) => {
+    const isLocal = qd.playerId === playerIdRef.current;
+    if (isLocal) {
+      setHiddenFromHand(qd.cards);
+      setHighlightedQuadCards([]);
+    }
+    setQuadDiscardShow({
+      id: Date.now(),
+      eventId: qd.eventId,
+      playerId: qd.playerId,
+      playerNick: nick,
+      value: qd.value,
+      cards: qd.cards,
+    });
+  }, []);
+
+  const startQuadDiscard = useCallback(
+    (qd: QuadDiscarded) => {
+      const nick = resolveNick(qd.playerId);
+      const isLocal = qd.playerId === playerIdRef.current;
+
+      if (quadHighlightTimerRef.current) {
+        clearTimeout(quadHighlightTimerRef.current);
+      }
+
+      if (isLocal) {
+        setHighlightedQuadCards(qd.cards);
+        quadHighlightTimerRef.current = setTimeout(() => beginQuadSplash(qd, nick), 750);
+      } else {
+        beginQuadSplash(qd, nick);
+      }
+    },
+    [beginQuadSplash],
+  );
+
+  const finishQuadDiscard = useCallback(() => {
+    setQuadDiscardShow(null);
+    setHighlightedQuadCards([]);
+    setHiddenFromHand([]);
+
+    const next = quadQueueRef.current.shift();
+    if (next) {
+      startQuadDiscard(next);
+      return;
+    }
+
+    isQuadAnimatingRef.current = false;
+    if (pendingHandUpdateRef.current) {
+      setHand(pendingHandUpdateRef.current);
+      pendingHandUpdateRef.current = null;
+    }
+  }, [setHand, startQuadDiscard]);
+
+  const handleQuadDiscardComplete = useCallback(() => {
+    const current = quadDiscardShow;
+    if (current?.eventId && clientId && roomCode) {
+      sendAck(clientId, roomCode, current.eventId);
+    }
+    finishQuadDiscard();
+  }, [quadDiscardShow, clientId, roomCode, finishQuadDiscard]);
 
   useEffect(() => {
     if (!roomCode || !playerId || !clientId) {
@@ -132,15 +239,33 @@ const Game: React.FC = () => {
     const unsubRoom = subscribeRoomTopic(roomCode, {
       onRoomState: (rs) => {
         setRoomState(rs);
-        if (isRoundOpen(rs)) {
-          setCenterPlay(null);
-        }
       },
       onPlayMade: handlePlayMade,
       onRoundEnded: (re) => {
-        setCenterPlay(null);
         const winnerNick = resolveNick(re.winnerPlayerId);
         showNotification(`${winnerNick} abre nueva ronda`);
+        const delay = lastPlayIsAsOrosRef.current ? 1400 : 700;
+        scheduleClearPile(delay);
+        if (re.eventId && clientId) {
+          sendAck(clientId, roomCode, re.eventId);
+        }
+      },
+      onRoundReset: (rr) => {
+        if (rr.reason === 'AS_OROS') {
+          scheduleClearPile(1400);
+        } else {
+          clearPile();
+        }
+        if (rr.eventId && clientId) {
+          sendAck(clientId, roomCode, rr.eventId);
+        }
+      },
+      onQuadDiscarded: (qd) => {
+        quadQueueRef.current.push(qd);
+        if (!isQuadAnimatingRef.current) {
+          isQuadAnimatingRef.current = true;
+          startQuadDiscard(quadQueueRef.current.shift()!);
+        }
       },
       onGameEnded: (ge) => {
         setRanking(ge.ranking);
@@ -168,13 +293,13 @@ const Game: React.FC = () => {
         showNotification(`Error: ${err.message}`);
       },
       onHandUpdate: (hu) => {
+        if (isQuadAnimatingRef.current) {
+          pendingHandUpdateRef.current = hu.cards;
+          return;
+        }
         setHand(hu.cards);
         if (!isFlyingRef.current) {
           setHiddenFromHand([]);
-        }
-        const rs = useGameStore.getState().roomState;
-        if (rs && isRoundOpen(rs)) {
-          setCenterPlay(null);
         }
       },
     });
@@ -183,6 +308,12 @@ const Game: React.FC = () => {
 
     return () => {
       cleanupRef.current.forEach((fn) => fn());
+      if (clearPileTimerRef.current) {
+        clearTimeout(clearPileTimerRef.current);
+      }
+      if (quadHighlightTimerRef.current) {
+        clearTimeout(quadHighlightTimerRef.current);
+      }
     };
   }, [
     roomCode,
@@ -195,6 +326,9 @@ const Game: React.FC = () => {
     setError,
     handlePlayMade,
     abortPendingPlay,
+    scheduleClearPile,
+    clearPile,
+    startQuadDiscard,
   ]);
 
   useEffect(() => {
@@ -278,12 +412,20 @@ const Game: React.FC = () => {
 
   const selectionLegal =
     selectedCards.length > 0 && isPlayLegal(selectedCards, roomState);
+  const isQuadAnimating = !!quadDiscardShow || highlightedQuadCards.length > 0;
+  const isOut = myPlayer.cardCount === 0;
   const canPlay =
-    isMyTurn && phase === 'PLAYING' && selectionLegal && !flyingCards && !hiddenFromHand.length;
+    isMyTurn &&
+    phase === 'PLAYING' &&
+    !isOut &&
+    selectionLegal &&
+    !flyingCards &&
+    !hiddenFromHand.length &&
+    !isQuadAnimating;
 
   const displayHand = orderedHand.length > 0 ? orderedHand : hand;
-  const tablePlay = isRoundOpen(roomState) ? null : centerPlay;
-  const isHandAnimatingPlay = hiddenFromHand.length > 0 || !!flyingCards;
+  const tablePile = centerPile;
+  const isHandAnimatingPlay = hiddenFromHand.length > 0 || !!flyingCards || isQuadAnimating;
 
   const applyHandSort = (sorted: Card[]) => {
     setOrderedHand(sorted);
@@ -385,6 +527,19 @@ const Game: React.FC = () => {
       </AnimatePresence>
 
       <AnimatePresence>
+        {quadDiscardShow && (
+          <QuadDiscardSplash
+            key={quadDiscardShow.id}
+            playerNick={quadDiscardShow.playerNick}
+            value={quadDiscardShow.value}
+            cards={quadDiscardShow.cards}
+            fromBottom={quadDiscardShow.playerId === playerId}
+            onComplete={handleQuadDiscardComplete}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {notification && (
           <motion.div
             className="game__notification"
@@ -416,7 +571,7 @@ const Game: React.FC = () => {
           )}
         </div>
 
-        <TablePile play={tablePlay} />
+        <TablePile plays={tablePile} />
 
         <PlayerSlot player={myPlayer} isCurrentPlayer={isMyTurn} isMe />
       </div>
@@ -427,7 +582,7 @@ const Game: React.FC = () => {
         </button>
         <button
           className="btn btn--secondary"
-          disabled={!isMyTurn || phase !== 'PLAYING' || !!flyingCards}
+          disabled={!isMyTurn || phase !== 'PLAYING' || isOut || !!flyingCards || isQuadAnimating}
           onClick={handlePass}
         >
           ⏭ Pasar
@@ -455,6 +610,7 @@ const Game: React.FC = () => {
           cards={displayHand}
           selectedCards={selectedCards}
           hiddenCards={hiddenFromHand}
+          highlightedCards={highlightedQuadCards}
           onToggleCard={toggleCard}
           onReorder={setOrderedHand}
           sortPulse={sortPulse}

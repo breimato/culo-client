@@ -7,8 +7,10 @@ import type {
   HandUpdate,
   JoinedRoom,
   PlayMade,
+  QuadDiscarded,
   RoomState,
   RoundEnded,
+  RoundReset,
   TurnChanged,
   WsError,
 } from '../types/game';
@@ -111,6 +113,8 @@ export function subscribeRoomTopic(
     onRoomState: (roomState: RoomState) => void;
     onPlayMade?: (playMade: PlayMade) => void;
     onRoundEnded?: (roundEnded: RoundEnded) => void;
+    onRoundReset?: (roundReset: RoundReset) => void;
+    onQuadDiscarded?: (quadDiscarded: QuadDiscarded) => void;
     onTurnChanged?: (turnChanged: TurnChanged) => void;
     onGameEnded?: (gameEnded: GameEnded) => void;
     onCuloSwapRequest?: (culoSwapRequest: CuloSwapRequest) => void;
@@ -166,6 +170,20 @@ export function subscribeRoomTopic(
       ),
     );
   }
+  if (handlers.onRoundReset) {
+    subs.push(
+      client.subscribe(`${base}/roundReset`, (msg) =>
+        handlers.onRoundReset!(JSON.parse(msg.body) as RoundReset),
+      ),
+    );
+  }
+  if (handlers.onQuadDiscarded) {
+    subs.push(
+      client.subscribe(`${base}/quadDiscarded`, (msg) =>
+        handlers.onQuadDiscarded!(JSON.parse(msg.body) as QuadDiscarded),
+      ),
+    );
+  }
   return () => subs.forEach((s) => s.unsubscribe());
 }
 
@@ -213,5 +231,12 @@ export function sendCuloSwapVote(clientId: string, roomCode: string, accept: boo
   stompClient!.publish({
     destination: '/app/culoSwap.vote',
     body: JSON.stringify({ clientId, roomCode, accept }),
+  });
+}
+
+export function sendAck(clientId: string, roomCode: string, eventId: string): void {
+  stompClient!.publish({
+    destination: '/app/game.ack',
+    body: JSON.stringify({ clientId, roomCode, eventId }),
   });
 }

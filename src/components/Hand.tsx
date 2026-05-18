@@ -9,6 +9,7 @@ interface HandProps {
   cards: Card[];
   selectedCards: Card[];
   hiddenCards?: Card[];
+  highlightedCards?: Card[];
   onToggleCard: (card: Card) => void;
   onReorder?: (cards: Card[]) => void;
   sortPulse?: number;
@@ -41,6 +42,7 @@ interface HandCardProps {
   idx: number;
   total: number;
   selected: boolean;
+  highlighted: boolean;
   disabled: boolean;
   onToggleCard: (card: Card) => void;
   didDragRef: React.MutableRefObject<boolean>;
@@ -51,15 +53,25 @@ const HandCard: React.FC<HandCardProps> = ({
   idx,
   total,
   selected,
+  highlighted,
   disabled,
   onToggleCard,
   didDragRef,
 }) => (
-  <div className="hand__card-wrapper" style={getFanStyle(idx, total)}>
+  <motion.div
+    className={`hand__card-wrapper${highlighted ? ' hand__card-wrapper--quad' : ''}`}
+    style={getFanStyle(idx, total)}
+    animate={
+      highlighted
+        ? { y: -18, scale: 1.06, transition: { type: 'spring', stiffness: 420, damping: 18 } }
+        : undefined
+    }
+  >
     <CardComponent
       card={card}
       size="hand"
       selected={selected}
+      highlighted={highlighted}
       disabled={disabled}
       onClick={() => {
         if (!didDragRef.current) {
@@ -67,13 +79,14 @@ const HandCard: React.FC<HandCardProps> = ({
         }
       }}
     />
-  </div>
+  </motion.div>
 );
 
 const Hand: React.FC<HandProps> = ({
   cards,
   selectedCards,
   hiddenCards = [],
+  highlightedCards = [],
   onToggleCard,
   onReorder,
   sortPulse = 0,
@@ -89,6 +102,7 @@ const Hand: React.FC<HandProps> = ({
   const canReorder = !disabled && !!onReorder;
 
   const isSelected = (card: Card) => selectedCards.some((s) => isSameCard(s, card));
+  const isHighlighted = (card: Card) => highlightedCards.some((h) => isSameCard(h, card));
 
   useEffect(() => {
     if (!sortPulse || !layoutAnimation) {
@@ -133,6 +147,7 @@ const Hand: React.FC<HandProps> = ({
           idx={fanIndex(card, idx)}
           total={fanTotal}
           selected={isSelected(card)}
+          highlighted={isHighlighted(card)}
           disabled={disabled}
           onToggleCard={onToggleCard}
           didDragRef={didDragRef}

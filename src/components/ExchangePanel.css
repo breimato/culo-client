@@ -78,3 +78,29 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(201, 162, 39, 0.4);
 }
+
+.exchange-view__waiting {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  max-width: 400px;
+}
+
+.exchange-view__waiting-pulse {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid rgba(201, 162, 39, 0.35);
+  border-top-color: #c9a227;
+}
+
+.exchange-view__waiting p {
+  margin: 0;
+  font-size: 16px;
+  color: #e8d5a0;
+  line-height: 1.5;
+}

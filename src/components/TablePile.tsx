@@ -8,19 +8,26 @@ export interface TablePilePlay {
   cards: Card[];
   playerNick: string;
   key: number;
+  isAsOros?: boolean;
 }
 
 interface TablePileProps {
-  play: TablePilePlay | null;
+  plays: TablePilePlay[];
 }
 
-const cardKey = (card: Card, index: number) => `${card.suit}-${card.number}-${index}`;
+const AS_OROS_GLOW = [
+  '0 0 0px rgba(245,200,66,0)',
+  '0 0 18px rgba(245,200,66,0.85), 0 0 32px rgba(245,200,66,0.4)',
+  '0 0 0px rgba(245,200,66,0)',
+];
 
-const TablePile: React.FC<TablePileProps> = ({ play }) => {
+const TablePile: React.FC<TablePileProps> = ({ plays }) => {
+  const lastPlay = plays[plays.length - 1];
+
   return (
     <div className="table-pile">
       <AnimatePresence mode="wait">
-        {!play || play.cards.length === 0 ? (
+        {plays.length === 0 ? (
           <motion.p
             key="empty"
             className="table-pile__empty"
@@ -32,40 +39,50 @@ const TablePile: React.FC<TablePileProps> = ({ play }) => {
           </motion.p>
         ) : (
           <motion.div
-            key={play.key}
+            key="pile"
             className="table-pile__content"
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, y: 80, scale: 0.8, transition: { duration: 0.4, ease: 'easeIn' } }}
             transition={{ type: 'spring', stiffness: 320, damping: 26 }}
           >
-            <span className="table-pile__label">Última jugada · {play.playerNick}</span>
-            <motion.div
-              className="table-pile__cards"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                visible: { transition: { staggerChildren: 0.06 } },
-              }}
-            >
-              {play.cards.map((card, index) => (
-                <motion.div
-                  key={cardKey(card, index)}
-                  className="table-pile__card"
-                  variants={{
-                    hidden: { opacity: 0, y: 24, rotate: -8 + index * 4 },
-                    visible: {
-                      opacity: 1,
-                      y: 0,
-                      rotate: -6 + index * 3,
-                      transition: { type: 'spring', stiffness: 400, damping: 22 },
-                    },
-                  }}
-                  style={{ zIndex: index }}
-                >
-                  <CardComponent card={card} size="table" />
-                </motion.div>
-              ))}
+            <span className="table-pile__label">Última jugada · {lastPlay.playerNick}</span>
+            <motion.div className="table-pile__cards">
+              {plays.map((play, playIndex) => {
+                const isLast = playIndex === plays.length - 1;
+                const glow = isLast && play.isAsOros;
+                const baseRotate = ((playIndex * 37 + 7) % 17) - 8;
+                const baseX = ((playIndex * 19 + 3) % 11) - 5;
+
+                return play.cards.map((card, cardIndex) => {
+                  const cardSpread = (cardIndex - (play.cards.length - 1) / 2) * 6;
+                  return (
+                    <motion.div
+                      key={`${play.key}-${cardIndex}`}
+                      className="table-pile__card"
+                      initial={{ opacity: 0, y: -40, rotate: baseRotate - 6 }}
+                      animate={{
+                        opacity: 1,
+                        x: baseX + cardSpread,
+                        y: 0,
+                        rotate: baseRotate + cardIndex * 2,
+                        boxShadow: glow ? AS_OROS_GLOW : '0 0 0px rgba(0,0,0,0)',
+                        transition: {
+                          type: 'spring',
+                          stiffness: 400,
+                          damping: 22,
+                          boxShadow: glow
+                            ? { duration: 0.9, repeat: Infinity, repeatType: 'mirror' as const }
+                            : { duration: 0 },
+                        },
+                      }}
+                      style={{ zIndex: playIndex * 10 + cardIndex }}
+                    >
+                      <CardComponent card={card} size="table" />
+                    </motion.div>
+                  );
+                });
+              })}
             </motion.div>
           </motion.div>
         )}

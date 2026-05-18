@@ -9,6 +9,7 @@ interface CardComponentProps {
   card: Card;
   size?: CardSize;
   selected?: boolean;
+  highlighted?: boolean;
   disabled?: boolean;
   faceDown?: boolean;
   onClick?: () => void;
@@ -19,6 +20,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
   card,
   size = 'hand',
   selected = false,
+  highlighted = false,
   disabled = false,
   faceDown = false,
   onClick,
@@ -33,6 +35,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
         'card',
         `card--${size}`,
         selected ? 'card--selected' : '',
+        highlighted ? 'card--quad-highlight' : '',
         disabled ? 'card--disabled' : '',
         faceDown ? 'card--back' : '',
         className,

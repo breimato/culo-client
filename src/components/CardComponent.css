@@ -33,6 +33,29 @@
   z-index: 10;
 }
 
+.card--quad-highlight {
+  outline: 3px solid #f5d76e;
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 4px rgba(245, 215, 110, 0.35),
+    0 16px 36px rgba(245, 200, 66, 0.55) !important;
+  z-index: 20;
+  animation: quad-pulse 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes quad-pulse {
+  from {
+    box-shadow:
+      0 0 0 4px rgba(245, 215, 110, 0.35),
+      0 12px 28px rgba(245, 200, 66, 0.45);
+  }
+  to {
+    box-shadow:
+      0 0 0 8px rgba(245, 215, 110, 0.5),
+      0 20px 44px rgba(245, 200, 66, 0.75);
+  }
+}
+
 .card--disabled {
   opacity: 0.5;
   cursor: default;

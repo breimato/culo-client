@@ -1,0 +1,91 @@
+.quad-discard {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quad-discard__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 42%, rgba(8, 28, 18, 0.15) 0%, rgba(0, 0, 0, 0.75) 70%);
+}
+
+.quad-discard__banner {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 2;
+  max-width: min(92vw, 520px);
+  padding: 0 16px;
+}
+
+.quad-discard__badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1a1408;
+  background: linear-gradient(135deg, #f5d76e 0%, #c9a227 100%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.quad-discard__title {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+  line-height: 1.05;
+}
+
+.quad-discard__subtitle {
+  margin: 0 0 6px;
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.quad-discard__subtitle strong {
+  color: #f5d76e;
+}
+
+.quad-discard__rule {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+}
+
+.quad-discard__cards {
+  position: absolute;
+  inset: 0;
+}
+
+.quad-discard__card {
+  position: absolute;
+  width: 148px;
+  height: 226px;
+  transform-origin: center center;
+}
+
+.quad-discard__card--hero {
+  width: 168px;
+  height: 256px;
+}
+
+.quad-discard__card--hero .card--table {
+  width: 168px;
+  height: 256px;
+}
+
+.quad-discard__card-inner {
+  pointer-events: none;
+}
