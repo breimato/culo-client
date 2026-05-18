@@ -12,6 +12,7 @@ interface HandProps {
   onToggleCard: (card: Card) => void;
   onReorder?: (cards: Card[]) => void;
   sortPulse?: number;
+  layoutAnimation?: boolean;
   disabled?: boolean;
   className?: string;
 }
@@ -76,6 +77,7 @@ const Hand: React.FC<HandProps> = ({
   onToggleCard,
   onReorder,
   sortPulse = 0,
+  layoutAnimation = true,
   disabled = false,
   className,
 }) => {
@@ -108,9 +110,16 @@ const Hand: React.FC<HandProps> = ({
     onReorder?.(newOrder);
   };
 
-  const handClassName = ['hand', sortAnimating ? 'hand--sorting' : '', className ?? '']
+  const handClassName = [
+    'hand',
+    sortAnimating ? 'hand--sorting' : '',
+    !layoutAnimation ? 'hand--playing' : '',
+    className ?? '',
+  ]
     .filter(Boolean)
     .join(' ');
+
+  const layoutTransition = layoutAnimation ? LAYOUT_SPRING : { duration: 0 };
 
   const renderSlots = (draggable: boolean) =>
     visibleCards.map((card, idx) => {
@@ -130,10 +139,10 @@ const Hand: React.FC<HandProps> = ({
         return (
           <motion.div
             key={cardKey(card)}
-            layout="position"
+            layout={layoutAnimation ? 'position' : false}
             className={`hand__slot${idx > 0 ? ' hand__slot--overlap' : ''}`}
             style={{ zIndex: idx + 1 }}
-            transition={{ layout: LAYOUT_SPRING }}
+            transition={{ layout: layoutTransition }}
           >
             {cardNode}
           </motion.div>
@@ -145,6 +154,7 @@ const Hand: React.FC<HandProps> = ({
           key={cardKey(card)}
           as="div"
           value={card}
+          layout={layoutAnimation ? 'position' : false}
           className={`hand__slot${idx > 0 ? ' hand__slot--overlap' : ''}`}
           style={{ zIndex: idx + 1 }}
           whileDrag={{
@@ -152,7 +162,7 @@ const Hand: React.FC<HandProps> = ({
             zIndex: 120,
           }}
           transition={{
-            layout: LAYOUT_SPRING,
+            layout: layoutTransition,
             scale: DRAG_SPRING,
           }}
           onDragStart={() => {

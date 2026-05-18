@@ -63,6 +63,11 @@
   z-index: 50;
 }
 
+/* Sin reflow animado al jugar (solo vuelo hacia la mesa) */
+.hand--playing .hand__card-wrapper {
+  transition: none;
+}
+
 /* Animación al pulsar ordenar (efecto ola en el abanico) */
 .hand--sorting .hand__card-wrapper {
   animation: hand-sort-pop 0.58s cubic-bezier(0.34, 1.25, 0.64, 1) both;

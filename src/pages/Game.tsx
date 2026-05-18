@@ -277,6 +277,7 @@ const Game: React.FC = () => {
 
   const displayHand = orderedHand.length > 0 ? orderedHand : hand;
   const tablePlay = isRoundOpen(roomState) ? null : centerPlay;
+  const isHandAnimatingPlay = hiddenFromHand.length > 0 || !!flyingCards;
 
   const applyHandSort = (sorted: Card[]) => {
     setOrderedHand(sorted);
@@ -451,6 +452,7 @@ const Game: React.FC = () => {
           onToggleCard={toggleCard}
           onReorder={setOrderedHand}
           sortPulse={sortPulse}
+          layoutAnimation={!isHandAnimatingPlay}
           disabled={!!flyingCards}
         />
       </div>
