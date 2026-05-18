@@ -58,6 +58,20 @@ El script hace `build` y sube `dist/` (incluye `public/.htaccess` para rutas SPA
 Ruta por defecto en SiteGround: `breimato.es/public_html/culo` → **https://breimato.es/culo/**  
 Ajusta `FTP_REMOTE_DIR` y `VITE_BASE_PATH` en `.env.deploy.local` si cambias la carpeta.
 
+### GitHub Actions (deploy automático)
+
+En el repo → **Settings → Secrets and variables → Actions**:
+
+| Secret | Descripción |
+|--------|-------------|
+| `SITEGROUND_FTP_HOST` | Host FTP |
+| `SITEGROUND_FTP_USERNAME` | Usuario FTP |
+| `SITEGROUND_FTP_PASSWORD` | Contraseña FTP |
+| `SITEGROUND_FTP_PORT` | Puerto (p. ej. `21`) |
+| `VITE_WS_URL` | URL SockJS de producción |
+
+Cada push a `main` ejecuta build y subida FTP (ver `.github/workflows/deploy.yml`).
+
 ## Script de cartas
 
 Para regenerar sprites desde la hoja maestra:

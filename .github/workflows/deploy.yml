@@ -47,10 +47,10 @@ jobs:
       - name: Deploy to SiteGround via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT || 21 }}
+          server: ${{ secrets.SITEGROUND_FTP_HOST }}
+          username: ${{ secrets.SITEGROUND_FTP_USERNAME }}
+          password: ${{ secrets.SITEGROUND_FTP_PASSWORD }}
+          port: ${{ secrets.SITEGROUND_FTP_PORT }}
           protocol: ftp
           local-dir: dist/
           server-dir: breimato.es/public_html/culo/
