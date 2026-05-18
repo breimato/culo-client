@@ -103,7 +103,7 @@ export function Home() {
             value={nick}
             onChange={(e) => setNick(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onCreateRoom()}
-            placeholder="Breixo"
+            placeholder="username"
             maxLength={20}
           />
         </label>
