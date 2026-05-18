@@ -1,0 +1,46 @@
+.table-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.table-pile__empty {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+  margin: 0;
+}
+
+.table-pile__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.table-pile__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9a227;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.table-pile__cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.table-pile__card {
+  margin-left: -36px;
+}
+
+.table-pile__card:first-child {
+  margin-left: 0;
+}

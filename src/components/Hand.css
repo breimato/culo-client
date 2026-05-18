@@ -1,0 +1,89 @@
+.hand {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: nowrap;
+  /* overflow-x:auto fuerza recorte vertical; el scroll va en .hand-viewport */
+  overflow: visible;
+  padding: 0 24px 22px;
+  min-height: 200px;
+  gap: 0;
+  touch-action: pan-x;
+}
+
+.hand-viewport {
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  /* Espacio reservado arriba para levantar/seleccionar cartas sin recorte */
+  padding-top: 128px;
+  margin-top: -76px;
+  padding-bottom: 4px;
+  /* El margen negativo solapa los botones; dejar pasar clics fuera de las cartas */
+  pointer-events: none;
+}
+
+.hand-viewport .hand,
+.hand-viewport .hand__slot,
+.hand-viewport .hand__card-wrapper {
+  pointer-events: auto;
+}
+
+.hand__slot {
+  flex-shrink: 0;
+  position: relative;
+  cursor: grab;
+  list-style: none;
+  overflow: visible;
+}
+
+.hand__slot--overlap {
+  margin-left: -36px;
+}
+
+.hand__slot:active {
+  cursor: grabbing;
+}
+
+.hand__card-wrapper {
+  transform-origin: 50% 100%;
+  transition:
+    transform 0.38s cubic-bezier(0.34, 1.12, 0.64, 1),
+    filter 0.25s ease;
+  transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate));
+  pointer-events: auto;
+}
+
+.hand__card-wrapper:hover {
+  z-index: 40;
+}
+
+.hand__card-wrapper:has(.card--selected) {
+  z-index: 50;
+}
+
+/* Animación al pulsar ordenar (efecto ola en el abanico) */
+.hand--sorting .hand__card-wrapper {
+  animation: hand-sort-pop 0.58s cubic-bezier(0.34, 1.25, 0.64, 1) both;
+  animation-delay: calc(var(--idx) * 28ms);
+}
+
+@keyframes hand-sort-pop {
+  0% {
+    transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(1);
+    filter: brightness(1);
+  }
+  38% {
+    transform: translateY(calc(var(--fan-lift) - 22px)) rotate(var(--fan-rotate)) scale(1.07);
+    filter: brightness(1.12);
+  }
+  72% {
+    transform: translateY(calc(var(--fan-lift) - 6px)) rotate(var(--fan-rotate)) scale(1.02);
+    filter: brightness(1.05);
+  }
+  100% {
+    transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(1);
+    filter: brightness(1);
+  }
+}

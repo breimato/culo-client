@@ -1,0 +1,17 @@
+.flying-play {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 80;
+}
+
+.flying-play__card {
+  position: absolute;
+  width: 148px;
+  height: 226px;
+  filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.55));
+}
+
+.flying-play__card-inner {
+  pointer-events: none;
+}

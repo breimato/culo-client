@@ -1,0 +1,51 @@
+.card {
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  background: #fff;
+}
+
+.card--hand {
+  width: 118px;
+  height: 180px;
+}
+
+.card--table {
+  width: 148px;
+  height: 226px;
+  cursor: default;
+}
+
+.card:hover:not(.card--disabled):not(.card--table) {
+  transform: translateY(-12px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+.card--selected {
+  transform: translateY(-26px) !important;
+  box-shadow: 0 14px 32px rgba(201, 162, 39, 0.75) !important;
+  outline: 3px solid #c9a227;
+  outline-offset: 2px;
+  z-index: 10;
+}
+
+.card--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.card--back {
+  cursor: default;
+}
+
+.card__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}

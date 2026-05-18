@@ -1,0 +1,80 @@
+.exchange-view {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 20px 12px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.exchange-view__header {
+  align-self: end;
+}
+
+.exchange-view__title {
+  font-size: 24px;
+  color: #c9a227;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+.exchange-view__instruction {
+  font-size: 16px;
+  color: #e8d5a0;
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.45;
+}
+
+.hand.hand--exchange {
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  margin: 0;
+  min-height: 0;
+  padding: 46px 0 0;
+  overflow: visible;
+}
+
+.exchange-view__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  align-self: start;
+}
+
+.exchange-view__hint {
+  font-size: 14px;
+  color: #a8b898;
+  margin: 0;
+}
+
+.exchange-view__btn {
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #c9a227, #8b6914);
+  border: none;
+  color: #1a1a0a;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.exchange-view__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.exchange-view__btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(201, 162, 39, 0.4);
+}
