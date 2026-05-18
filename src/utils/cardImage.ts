@@ -1,6 +1,6 @@
 import type { Card, Suit } from '../types/game';
 
-const CARD_IMAGE_BASE = '/cards';
+const CARD_IMAGE_BASE = `${import.meta.env.BASE_URL}cards`;
 
 export function getCardImagePath(suit: Suit, number: number): string {
   return `${CARD_IMAGE_BASE}/${suit}_${number}.png`;

@@ -24,7 +24,9 @@ async function buildClient(): Promise<Client> {
     reconnectDelay: 5000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
-    debug: import.meta.env.DEV ? (msg) => console.debug('[STOMP]', msg) : undefined,
+    debug: import.meta.env.DEV
+      ? (msg) => console.debug('[STOMP]', msg)
+      : () => {},
   });
 }
 

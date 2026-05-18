@@ -42,9 +42,21 @@ Salida en `dist/`. Súbela a SiteGround, Vercel, Netlify, etc.
 - Output: `dist`
 - Variable: `VITE_WS_URL=https://tu-api/ws`
 
-### SiteGround
+### SiteGround (FTP)
 
-Sube el contenido de `dist/` a `public_html` y añade `.htaccess` para SPA (ver `vercel.json` como referencia de rewrites).
+1. Copia `.env.deploy.example` → `.env.deploy.local` y rellena host, usuario y contraseña FTP.
+2. Define `VITE_WS_URL` con la URL SockJS de producción.
+3. Ejecuta:
+
+```bash
+pnpm install
+pnpm deploy:ftp
+```
+
+El script hace `build` y sube `dist/` (incluye `public/.htaccess` para rutas SPA).
+
+Ruta por defecto en SiteGround: `breimato.es/public_html/culo` → **https://breimato.es/culo/**  
+Ajusta `FTP_REMOTE_DIR` y `VITE_BASE_PATH` en `.env.deploy.local` si cambias la carpeta.
 
 ## Script de cartas
 
