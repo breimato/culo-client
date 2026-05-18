@@ -49,6 +49,9 @@ const REQ_LABEL: Record<number, string> = {
   3: 'Tríos',
 };
 
+/** Pausa entre cartas en mesa y splash de PLIN. */
+const PLIN_TABLE_DELAY_MS = 1000;
+
 const Game: React.FC = () => {
   const navigate = useNavigate();
   const { clientId, playerId, roomCode, roomState, hand, setRoomState, setHand, setRanking, setError } =
@@ -87,6 +90,9 @@ const Game: React.FC = () => {
   const quadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseRef = useRef<GamePhase>('LOBBY');
   const playEpochRef = useRef(0);
+  const pendingLocalPlayMetaRef = useRef<{ eventId?: string; plin: boolean } | null>(null);
+  const localPlayOnTableRef = useRef(false);
+  const plinDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bumpPileKey = () => {
     pileKeyRef.current += 1;
@@ -106,6 +112,12 @@ const Game: React.FC = () => {
   }, []);
 
   const resetPlayVisuals = useCallback(() => {
+    if (plinDelayTimerRef.current) {
+      clearTimeout(plinDelayTimerRef.current);
+      plinDelayTimerRef.current = null;
+    }
+    pendingLocalPlayMetaRef.current = null;
+    localPlayOnTableRef.current = false;
     clearPile();
     setPlinSplash(null);
     setFlyingCards(null);
@@ -141,6 +153,46 @@ const Game: React.FC = () => {
     setPlinSplash({ id: Date.now(), nick });
   }, []);
 
+  const ackPlayEvent = useCallback(
+    (eventId?: string) => {
+      const code = useGameStore.getState().roomCode;
+      if (eventId && clientId && code) {
+        sendAck(clientId, code, eventId);
+      }
+    },
+    [clientId],
+  );
+
+  const schedulePlinAfterTable = useCallback(
+    (nick: string, afterTable?: () => void) => {
+      if (plinDelayTimerRef.current) {
+        clearTimeout(plinDelayTimerRef.current);
+      }
+      afterTable?.();
+      plinDelayTimerRef.current = window.setTimeout(() => {
+        plinDelayTimerRef.current = null;
+        showPlinSplash(nick);
+      }, PLIN_TABLE_DELAY_MS);
+    },
+    [showPlinSplash],
+  );
+
+  const finishLocalPlayAck = useCallback(() => {
+    const meta = pendingLocalPlayMetaRef.current;
+    if (!meta || !localPlayOnTableRef.current) {
+      return;
+    }
+    pendingLocalPlayMetaRef.current = null;
+    localPlayOnTableRef.current = false;
+
+    const myNick = resolveNick(playerIdRef.current ?? '');
+    if (meta.plin) {
+      schedulePlinAfterTable(myNick, () => ackPlayEvent(meta.eventId));
+    } else {
+      ackPlayEvent(meta.eventId);
+    }
+  }, [schedulePlinAfterTable, ackPlayEvent]);
+
   const handlePlayMade = useCallback(
     (pm: PlayMade) => {
       if (phaseRef.current !== 'PLAYING') {
@@ -156,23 +208,24 @@ const Game: React.FC = () => {
       }
 
       const nick = resolveNick(pm.playerId);
+
+      if (isLocal) {
+        pendingLocalPlayMetaRef.current = { eventId: pm.eventId, plin: pm.plin };
+        finishLocalPlayAck();
+        return;
+      }
+
+      showTablePlay(pm.cards, nick, pm.isAsOros);
+
       if (pm.plin) {
-        showPlinSplash(nick);
+        schedulePlinAfterTable(nick, () => ackPlayEvent(pm.eventId));
       } else {
         const suffix = pm.isAsOros ? ' ¡As de Oros!' : '';
         showNotification(`${nick} jugó ${pm.cards.length} carta(s)${suffix}`);
+        ackPlayEvent(pm.eventId);
       }
-
-      if (pm.eventId && clientId) {
-        sendAck(clientId, useGameStore.getState().roomCode ?? '', pm.eventId);
-      }
-
-      if (isLocal) {
-        return;
-      }
-      showTablePlay(pm.cards, nick, pm.isAsOros);
     },
-    [showTablePlay, showPlinSplash, clientId],
+    [showTablePlay, schedulePlinAfterTable, ackPlayEvent, finishLocalPlayAck],
   );
 
   const abortPendingPlay = useCallback(() => {
@@ -180,6 +233,8 @@ const Game: React.FC = () => {
     setFlyingCards(null);
     setHiddenFromHand([]);
     setSelectedCards([...lastLocalPlayRef.current]);
+    pendingLocalPlayMetaRef.current = null;
+    localPlayOnTableRef.current = false;
   }, []);
 
   const handleFlyComplete = useCallback(() => {
@@ -190,7 +245,9 @@ const Game: React.FC = () => {
     const isAsOros = cards.length === 1 && cards[0].number === 1 && cards[0].suit === 'OROS';
     showTablePlay(cards, myNick, isAsOros);
     setHiddenFromHand([]);
-  }, [showTablePlay]);
+    localPlayOnTableRef.current = true;
+    finishLocalPlayAck();
+  }, [showTablePlay, finishLocalPlayAck]);
 
   const beginQuadSplash = useCallback((qd: QuadDiscarded, nick: string) => {
     const isLocal = qd.playerId === playerIdRef.current;
@@ -345,6 +402,9 @@ const Game: React.FC = () => {
       }
       if (quadHighlightTimerRef.current) {
         clearTimeout(quadHighlightTimerRef.current);
+      }
+      if (plinDelayTimerRef.current) {
+        clearTimeout(plinDelayTimerRef.current);
       }
     };
   }, [
