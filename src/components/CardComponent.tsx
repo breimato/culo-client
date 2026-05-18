@@ -3,7 +3,7 @@ import type { Card } from '../types/game';
 import { getCardBackPath, getCardImagePathFromCard } from '../utils/cardImage';
 import './CardComponent.css';
 
-export type CardSize = 'hand' | 'table';
+export type CardSize = 'hand' | 'table' | 'opponent';
 
 interface CardComponentProps {
   card: Card;

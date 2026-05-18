@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import CuloSwapModal from '../components/CuloSwapModal';
 import ExchangePanel from '../components/ExchangePanel';
@@ -10,7 +11,7 @@ import QuadDiscardSplash from '../components/QuadDiscardSplash';
 import PlayerSlot from '../components/PlayerSlot';
 import TablePile, { type TablePilePlay } from '../components/TablePile';
 import { useGameStore } from '../store/gameStore';
-import type { Card, PlayMade, QuadDiscarded } from '../types/game';
+import type { Card, GamePhase, PlayMade, QuadDiscarded } from '../types/game';
 import { isSameCard } from '../utils/cards';
 import { isPlayLegal, isRoundOpen } from '../utils/gameRules';
 import { mergeHandOrder, sortHandByNumber, sortHandBySuit } from '../utils/handOrder';
@@ -84,6 +85,8 @@ const Game: React.FC = () => {
   const isQuadAnimatingRef = useRef(false);
   const pendingHandUpdateRef = useRef<Card[] | null>(null);
   const quadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phaseRef = useRef<GamePhase>('LOBBY');
+  const playEpochRef = useRef(0);
 
   const bumpPileKey = () => {
     pileKeyRef.current += 1;
@@ -101,6 +104,15 @@ const Game: React.FC = () => {
     lastPlayIsAsOrosRef.current = false;
     setCenterPile([]);
   }, []);
+
+  const resetPlayVisuals = useCallback(() => {
+    clearPile();
+    setPlinSplash(null);
+    setFlyingCards(null);
+    isFlyingRef.current = false;
+    setHiddenFromHand([]);
+    setSelectedCards([]);
+  }, [clearPile]);
 
   const scheduleClearPile = useCallback((delayMs: number) => {
     if (clearPileTimerRef.current) {
@@ -131,6 +143,18 @@ const Game: React.FC = () => {
 
   const handlePlayMade = useCallback(
     (pm: PlayMade) => {
+      if (phaseRef.current !== 'PLAYING') {
+        return;
+      }
+      const isLocal = pm.playerId === playerIdRef.current;
+      if (
+        !isLocal &&
+        pm.playEpoch !== undefined &&
+        pm.playEpoch !== playEpochRef.current
+      ) {
+        return;
+      }
+
       const nick = resolveNick(pm.playerId);
       if (pm.plin) {
         showPlinSplash(nick);
@@ -143,8 +167,7 @@ const Game: React.FC = () => {
         sendAck(clientId, useGameStore.getState().roomCode ?? '', pm.eventId);
       }
 
-      if (pm.playerId === playerIdRef.current && isFlyingRef.current) {
-        setFlyingCards([...lastLocalPlayRef.current]);
+      if (isLocal) {
         return;
       }
       showTablePlay(pm.cards, nick, pm.isAsOros);
@@ -238,10 +261,18 @@ const Game: React.FC = () => {
 
     const unsubRoom = subscribeRoomTopic(roomCode, {
       onRoomState: (rs) => {
+        phaseRef.current = rs.phase;
+        if (rs.playEpoch !== undefined) {
+          playEpochRef.current = rs.playEpoch;
+        }
+        if (rs.phase !== 'PLAYING') {
+          resetPlayVisuals();
+        }
         setRoomState(rs);
       },
       onPlayMade: handlePlayMade,
       onRoundEnded: (re) => {
+        setPlinSplash(null);
         const winnerNick = resolveNick(re.winnerPlayerId);
         showNotification(`${winnerNick} abre nueva ronda`);
         const delay = lastPlayIsAsOrosRef.current ? 1400 : 700;
@@ -268,6 +299,7 @@ const Game: React.FC = () => {
         }
       },
       onGameEnded: (ge) => {
+        resetPlayVisuals();
         setRanking(ge.ranking);
         showNotification('¡Partida terminada!');
       },
@@ -329,6 +361,7 @@ const Game: React.FC = () => {
     scheduleClearPile,
     clearPile,
     startQuadDiscard,
+    resetPlayVisuals,
   ]);
 
   useEffect(() => {
@@ -378,6 +411,7 @@ const Game: React.FC = () => {
     isFlyingRef.current = true;
     setHiddenFromHand(cards);
     setSelectedCards([]);
+    setFlyingCards(cards);
     sendPlayCards(clientId, roomCode, cards);
   };
 
@@ -512,9 +546,11 @@ const Game: React.FC = () => {
   // ─── PLAYING phase ─────────────────────────────────────────────────────────
   return (
     <div className="game game--playing">
-      {flyingCards && (
-        <FlyingPlayAnimation cards={flyingCards} onComplete={handleFlyComplete} />
-      )}
+      {flyingCards &&
+        createPortal(
+          <FlyingPlayAnimation cards={flyingCards} onComplete={handleFlyComplete} />,
+          document.body,
+        )}
 
       <AnimatePresence>
         {plinSplash && (
@@ -552,13 +588,15 @@ const Game: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className="game__players-ring">
+      <div className="game__opponents">
         {otherPlayers.map((player) => (
           <PlayerSlot
             key={player.id}
             player={player}
             isCurrentPlayer={player.id === roomState.currentPlayerId}
             isMe={false}
+            showOpponentHand
+            variant="opponent"
           />
         ))}
       </div>
@@ -572,8 +610,10 @@ const Game: React.FC = () => {
         </div>
 
         <TablePile plays={tablePile} />
+      </div>
 
-        <PlayerSlot player={myPlayer} isCurrentPlayer={isMyTurn} isMe />
+      <div className="game__self">
+        <PlayerSlot player={myPlayer} isCurrentPlayer={isMyTurn} isMe variant="self" />
       </div>
 
       <div className="game__actions">

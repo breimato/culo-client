@@ -2,6 +2,7 @@ import { LayoutGroup, Reorder, motion } from 'framer-motion';
 import React, { useEffect, useRef, useState } from 'react';
 import type { Card } from '../types/game';
 import { cardKey, isSameCard } from '../utils/cards';
+import { getCardFanStyle, HAND_FAN_OPTIONS } from '../utils/cardFan';
 import CardComponent from './CardComponent';
 import './Hand.css';
 
@@ -20,22 +21,6 @@ interface HandProps {
 
 const LAYOUT_SPRING = { type: 'spring' as const, stiffness: 420, damping: 34, mass: 0.82 };
 const DRAG_SPRING = { type: 'spring' as const, stiffness: 520, damping: 30, mass: 0.75 };
-
-const getFanStyle = (idx: number, total: number): React.CSSProperties => {
-  const center = (total - 1) / 2;
-  const maxDistance = Math.max(center, 1);
-  const distanceFromCenter = Math.abs(idx - center);
-  const normalizedFromCenter = total <= 1 ? 0 : (idx - center) / maxDistance;
-  const edgeDistance = total <= 1 ? 0 : distanceFromCenter / maxDistance;
-  const centerLift = (1 - edgeDistance * edgeDistance) * 42;
-
-  return {
-    '--idx': idx,
-    '--total': total,
-    '--fan-rotate': `${normalizedFromCenter * 6}deg`,
-    '--fan-lift': `-${centerLift}px`,
-  } as React.CSSProperties;
-};
 
 interface HandCardProps {
   card: Card;
@@ -60,7 +45,7 @@ const HandCard: React.FC<HandCardProps> = ({
 }) => (
   <motion.div
     className={`hand__card-wrapper${highlighted ? ' hand__card-wrapper--quad' : ''}`}
-    style={getFanStyle(idx, total)}
+    style={getCardFanStyle(idx, total, HAND_FAN_OPTIONS)}
     animate={
       highlighted
         ? { y: -18, scale: 1.06, transition: { type: 'spring', stiffness: 420, damping: 18 } }
@@ -99,7 +84,7 @@ const Hand: React.FC<HandProps> = ({
 
   const hiddenSet = new Set(hiddenCards.map(cardKey));
   const visibleCards = cards.filter((c) => !hiddenSet.has(cardKey(c)));
-  const canReorder = !disabled && !!onReorder;
+  const canReorder = !!onReorder;
 
   const isSelected = (card: Card) => selectedCards.some((s) => isSameCard(s, card));
   const isHighlighted = (card: Card) => highlightedCards.some((h) => isSameCard(h, card));
@@ -176,15 +161,21 @@ const Hand: React.FC<HandProps> = ({
           layout={layoutAnimation ? 'position' : undefined}
           className={`hand__slot${idx > 0 ? ' hand__slot--overlap' : ''}`}
           style={{ zIndex: idx + 1 }}
-          whileDrag={{
-            scale: 1.06,
-            zIndex: 120,
-          }}
+          dragListener={!disabled}
+          whileDrag={
+            disabled
+              ? undefined
+              : {
+                  scale: 1.06,
+                  zIndex: 120,
+                }
+          }
           transition={{
             layout: layoutTransition,
             scale: DRAG_SPRING,
           }}
           onDragStart={() => {
+            if (disabled) return;
             didDragRef.current = false;
           }}
           onDrag={() => {

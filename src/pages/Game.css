@@ -37,40 +37,76 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Players ring (top) ─────────────────────────────────────────────── */
-
-.game__players-ring {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 16px;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-/* ── Table (center) ─────────────────────────────────────────────────── */
+/* ── PLAYING: grid con zonas fijas (sin solapes) ───────────────────── */
 
 .game--playing {
-  min-height: 100dvh;
-}
-
-.game--playing .game__table {
-  flex: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    'opponents'
+    'table'
+    'self'
+    'actions'
+    'hand';
+  height: 100dvh;
   min-height: 0;
 }
 
-.game--playing .hand {
-  flex-shrink: 0;
+.game--playing .game__opponents {
+  grid-area: opponents;
 }
 
+.game--playing .game__table {
+  grid-area: table;
+}
+
+.game--playing .game__self {
+  grid-area: self;
+}
+
+.game--playing .game__actions {
+  grid-area: actions;
+}
+
+.game--playing .game__hand-bar {
+  grid-area: hand;
+}
+
+/* Rivales: fila superior reservada */
+.game__opponents {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(12px, 3vw, 32px);
+  padding: 10px 12px 6px;
+  overflow-x: auto;
+  overflow-y: visible;
+  flex-shrink: 0;
+  min-height: 130px;
+  scrollbar-width: thin;
+}
+
+.game__opponents::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* Mesa: solo requisito + montón */
 .game__table {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 10px;
+  min-height: 0;
+  padding: 4px 16px;
+  overflow: hidden;
+}
+
+.game--playing .game__table .table-pile {
+  min-height: 0;
+  flex: 1;
+  max-height: 100%;
 }
 
 .game__round-info {
@@ -83,12 +119,20 @@
   padding: 6px 16px;
   border-radius: 20px;
   border: 1px solid rgba(201, 162, 39, 0.3);
+  flex-shrink: 0;
 }
 
 .game__last-rank {
   color: #e8d5a0;
 }
 
+/* Tu ficha: entre mesa y botones */
+.game__self {
+  display: flex;
+  justify-content: center;
+  padding: 2px 16px 4px;
+  flex-shrink: 0;
+}
 
 /* ── Actions ─────────────────────────────────────────────────────────── */
 
@@ -96,7 +140,7 @@
   display: flex;
   gap: 12px;
   justify-content: center;
-  padding: 8px 16px;
+  padding: 6px 16px 4px;
   flex-shrink: 0;
 }
 
@@ -109,6 +153,11 @@
   z-index: 40;
   overflow: visible;
   width: 100%;
+  min-height: 0;
+}
+
+.game--playing .hand {
+  flex-shrink: 0;
 }
 
 .game__hand-sort {

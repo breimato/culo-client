@@ -20,6 +20,14 @@
   cursor: default;
 }
 
+.card--opponent {
+  width: 40px;
+  height: 60px;
+  cursor: default;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border-radius: 5px;
+}
+
 .card:hover:not(.card--disabled):not(.card--table) {
   transform: translateY(-12px);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);

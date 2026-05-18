@@ -48,6 +48,7 @@ export interface RoomState {
   culoSwapInitiatorId: string | null;
   culoSwapTargetId: string | null;
   exchangeDonePlayerIds?: string[];
+  playEpoch?: number;
 }
 
 export interface JoinedRoom {
@@ -61,6 +62,7 @@ export interface HandUpdate {
 
 export interface PlayMade {
   eventId?: string;
+  playEpoch?: number;
   playerId: string;
   cards: Card[];
   plin: boolean;
