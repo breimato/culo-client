@@ -169,7 +169,9 @@ const Game: React.FC = () => {
       },
       onHandUpdate: (hu) => {
         setHand(hu.cards);
-        setHiddenFromHand([]);
+        if (!isFlyingRef.current) {
+          setHiddenFromHand([]);
+        }
         const rs = useGameStore.getState().roomState;
         if (rs && isRoundOpen(rs)) {
           setCenterPlay(null);
@@ -196,8 +198,12 @@ const Game: React.FC = () => {
   ]);
 
   useEffect(() => {
+    if (roomState?.phase === 'EXCHANGE') {
+      setOrderedHand(sortHandByNumber(hand));
+      return;
+    }
     setOrderedHand((prev) => mergeHandOrder(prev, hand));
-  }, [hand]);
+  }, [hand, roomState?.phase]);
 
   if (!roomState || !playerId) {
     return (
@@ -453,7 +459,7 @@ const Game: React.FC = () => {
           onReorder={setOrderedHand}
           sortPulse={sortPulse}
           layoutAnimation={!isHandAnimatingPlay}
-          disabled={!!flyingCards}
+          disabled={!!flyingCards || isHandAnimatingPlay}
         />
       </div>
     </div>

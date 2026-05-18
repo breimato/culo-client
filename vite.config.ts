@@ -12,10 +12,11 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: false,
     proxy: {
+      // SockJS usa HTTP (xhr/streaming); ws:true provoca ECONNRESET en Vite
       '/ws': {
-        target: 'http://localhost:8080',
-        ws: true,
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },

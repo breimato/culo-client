@@ -91,14 +91,14 @@ const Hand: React.FC<HandProps> = ({
   const isSelected = (card: Card) => selectedCards.some((s) => isSameCard(s, card));
 
   useEffect(() => {
-    if (!sortPulse) {
+    if (!sortPulse || !layoutAnimation) {
       return;
     }
     setSortAnimating(true);
-    const duration = 620 + visibleCards.length * 28;
+    const duration = 620 + cards.length * 28;
     const timer = window.setTimeout(() => setSortAnimating(false), duration);
     return () => window.clearTimeout(timer);
-  }, [sortPulse, visibleCards.length]);
+  }, [sortPulse, layoutAnimation, cards.length]);
 
   const handleReorder = (newOrder: Card[]) => {
     if (hiddenCards.length > 0) {
@@ -121,13 +121,17 @@ const Hand: React.FC<HandProps> = ({
 
   const layoutTransition = layoutAnimation ? LAYOUT_SPRING : { duration: 0 };
 
+  const fanTotal = layoutAnimation ? visibleCards.length : cards.length;
+  const fanIndex = (card: Card, visibleIdx: number) =>
+    layoutAnimation ? visibleIdx : cards.findIndex((c) => cardKey(c) === cardKey(card));
+
   const renderSlots = (draggable: boolean) =>
     visibleCards.map((card, idx) => {
       const cardNode = (
         <HandCard
           card={card}
-          idx={idx}
-          total={visibleCards.length}
+          idx={fanIndex(card, idx)}
+          total={fanTotal}
           selected={isSelected(card)}
           disabled={disabled}
           onToggleCard={onToggleCard}

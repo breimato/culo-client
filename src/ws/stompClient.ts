@@ -13,7 +13,10 @@ import type {
   WsError,
 } from '../types/game';
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:8080/ws';
+/** Dev: backend directo (CORS con localhost:*). Prod: VITE_WS_URL del build. */
+const WS_URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_WS_URL || 'http://127.0.0.1:8080/ws')
+  : (import.meta.env.VITE_WS_URL ?? 'http://localhost:8080/ws');
 
 let stompClient: Client | null = null;
 

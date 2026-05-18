@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Card, Player, PlayerRole, RoomState } from '../types/game';
+import { cardKey } from '../utils/cards';
+import { sortHandByNumber } from '../utils/handOrder';
 import Hand from './Hand';
 import './ExchangePanel.css';
 
@@ -18,6 +20,12 @@ const ROLE_INSTRUCTION: Partial<Record<PlayerRole, { count: number; receiverRole
 const ExchangePanel: React.FC<ExchangePanelProps> = ({ roomState, myPlayer, hand, onGive }) => {
   const [selected, setSelected] = useState<Card[]>([]);
   const config = ROLE_INSTRUCTION[myPlayer.role];
+
+  const sortedHand = useMemo(() => sortHandByNumber(hand), [hand]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [sortedHand]);
 
   const toggleCard = (card: Card) => {
     if (!config) {
@@ -52,11 +60,13 @@ const ExchangePanel: React.FC<ExchangePanelProps> = ({ roomState, myPlayer, hand
       </header>
 
       <Hand
+        key={sortedHand.map(cardKey).join('|')}
         className="hand--exchange"
-        cards={hand}
+        cards={sortedHand}
         selectedCards={config ? selected : []}
         onToggleCard={toggleCard}
         disabled={!config}
+        layoutAnimation={false}
       />
 
       {config && (
