@@ -498,6 +498,20 @@ const Game: React.FC = () => {
     );
   }
 
+  const expectsHand =
+    myPlayer.cardCount > 0 &&
+    (roomState.phase === 'PLAYING' ||
+      roomState.phase === 'EXCHANGE' ||
+      roomState.phase === 'DEALING');
+  if (expectsHand && hand.length === 0) {
+    return (
+      <motion.div className="game-loading">
+        <div className="spinner" />
+        <p>Sincronizando mano…</p>
+      </motion.div>
+    );
+  }
+
   const isMyTurn = roomState.currentPlayerId === playerId;
   const isCulo = myPlayer.role === 'CULO';
   const phase = roomState.phase ?? 'LOBBY';
