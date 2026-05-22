@@ -1,10 +1,16 @@
 ﻿import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
+import { subscribeClientTopics, subscribeRoomTopic } from '../ws/stompClient';
+import { restoreRoomSession } from '../ws/restoreRoomSession';
+
+const SESSION_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_EXPIRED', 'PLAYER_NOT_IN_ROOM']);
 
 export function Lobby() {
   const navigate = useNavigate();
+  const hydrated = useStoreHydrated();
   const clientId = useGameStore((state) => state.clientId);
   const playerId = useGameStore((state) => state.playerId);
   const roomCode = useGameStore((state) => state.roomCode);
@@ -12,41 +18,59 @@ export function Lobby() {
   const setRoomState = useGameStore((state) => state.setRoomState);
   const lastError = useGameStore((state) => state.lastError);
   const setError = useGameStore((state) => state.setError);
+  const clearSession = useGameStore((state) => state.clearSession);
 
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const restoreCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!roomCode || !playerId) {
       navigate('/');
       return;
     }
 
+    const { nick, clientId: storedClientId } = useGameStore.getState();
+
     const setup = async () => {
-      const {
-        connectStomp,
-        subscribeRoomTopic,
-        subscribeClientTopics,
-        sendJoinRoom,
-      } = await import('../ws/stompClient');
-
-      // Read persisted values directly from store snapshot (not reactive)
-      const { nick, clientId: storedClientId } = useGameStore.getState();
-
-      await connectStomp(() => {
-        // 1. Subscribe FIRST so we don't miss the broadcast
-        subscribeRoomTopic(roomCode, { onRoomState: setRoomState });
-        subscribeClientTopics(storedClientId, {
-          onJoined: () => undefined,
-          onError: setError,
+      try {
+        const cleanup = await restoreRoomSession(storedClientId, roomCode, nick, () => {
+          const unsubRoom = subscribeRoomTopic(roomCode, { onRoomState: setRoomState });
+          const unsubClient = subscribeClientTopics(storedClientId, {
+            onJoined: () => undefined,
+            onError: (err) => {
+              setError(err);
+              if (SESSION_ERROR_CODES.has(err.code)) {
+                clearSession();
+                navigate('/');
+              }
+            },
+          });
+          return () => {
+            unsubRoom();
+            unsubClient();
+          };
         });
-        // 2. Re-send join: server detects existing player and re-emits roomState
-        sendJoinRoom(storedClientId, roomCode, nick);
-      });
+        restoreCleanupRef.current = cleanup;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'No se pudo conectar';
+        setError({ code: 'CONNECTION', message });
+        navigate('/');
+      } finally {
+        setConnecting(false);
+      }
     };
 
     void setup();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => {
+      restoreCleanupRef.current?.();
+      restoreCleanupRef.current = null;
+    };
+  }, [hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (roomState?.phase && roomState.phase !== 'LOBBY') {
@@ -54,13 +78,13 @@ export function Lobby() {
     }
   }, [roomState?.phase, navigate]);
 
-  if (!roomCode || !playerId) return null;
+  if (!hydrated || !roomCode || !playerId) return null;
 
-  if (!roomState) {
+  if (connecting || !roomState) {
     return (
       <div className="page lobby-page">
         <p style={{ color: 'var(--cream-muted)', textAlign: 'center' }}>
-          Conectando…
+          Reconectando…
         </p>
       </div>
     );

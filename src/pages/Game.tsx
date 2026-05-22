@@ -10,6 +10,7 @@ import PlinSplash from '../components/PlinSplash';
 import QuadDiscardSplash from '../components/QuadDiscardSplash';
 import PlayerSlot from '../components/PlayerSlot';
 import TablePile, { type TablePilePlay } from '../components/TablePile';
+import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
 import type { Card, GamePhase, PlayMade, QuadDiscarded } from '../types/game';
 import { isSameCard } from '../utils/cards';
@@ -26,6 +27,9 @@ import {
   subscribeClientTopics,
   subscribeRoomTopic,
 } from '../ws/stompClient';
+import { restoreRoomSession } from '../ws/restoreRoomSession';
+
+const SESSION_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_EXPIRED', 'PLAYER_NOT_IN_ROOM']);
 import './Game.css';
 
 const RANK_LABEL: Record<string, string> = {
@@ -54,7 +58,8 @@ const PLIN_TABLE_DELAY_MS = 1000;
 
 const Game: React.FC = () => {
   const navigate = useNavigate();
-  const { clientId, playerId, roomCode, roomState, hand, setRoomState, setHand, setRanking, setError } =
+  const hydrated = useStoreHydrated();
+  const { clientId, playerId, roomCode, roomState, hand, setRoomState, setHand, setRanking, setError, clearSession } =
     useGameStore();
 
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
@@ -311,92 +316,128 @@ const Game: React.FC = () => {
   }, [quadDiscardShow, clientId, roomCode, finishQuadDiscard]);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!roomCode || !playerId || !clientId) {
       navigate('/');
       return;
     }
 
-    const unsubRoom = subscribeRoomTopic(roomCode, {
-      onRoomState: (rs) => {
-        phaseRef.current = rs.phase;
-        if (rs.playEpoch !== undefined) {
-          playEpochRef.current = rs.playEpoch;
-        }
-        if (rs.phase !== 'PLAYING') {
-          resetPlayVisuals();
-        }
-        setRoomState(rs);
-      },
-      onPlayMade: handlePlayMade,
-      onRoundEnded: (re) => {
-        setPlinSplash(null);
-        const winnerNick = resolveNick(re.winnerPlayerId);
-        showNotification(`${winnerNick} abre nueva ronda`);
-        const delay = lastPlayIsAsOrosRef.current ? 1400 : 700;
-        scheduleClearPile(delay);
-        if (re.eventId && clientId) {
-          sendAck(clientId, roomCode, re.eventId);
-        }
-      },
-      onRoundReset: (rr) => {
-        if (rr.reason === 'AS_OROS') {
-          scheduleClearPile(1400);
-        } else {
-          clearPile();
-        }
-        if (rr.eventId && clientId) {
-          sendAck(clientId, roomCode, rr.eventId);
-        }
-      },
-      onQuadDiscarded: (qd) => {
-        quadQueueRef.current.push(qd);
-        if (!isQuadAnimatingRef.current) {
-          isQuadAnimatingRef.current = true;
-          startQuadDiscard(quadQueueRef.current.shift()!);
-        }
-      },
-      onGameEnded: (ge) => {
-        resetPlayVisuals();
-        setRanking(ge.ranking);
-        showNotification('¡Partida terminada!');
-      },
-      onCuloSwapRequest: () => {
-        showNotification('🍑 ¡Votación de transferencia de culo!');
-      },
-      onCuloSwapResult: (result) => {
-        if (result.accepted) {
-          showNotification('✅ Transferencia aceptada');
-        } else {
-          showNotification('❌ Transferencia rechazada');
-        }
-      },
-    });
+    const { nick } = useGameStore.getState();
+    let cancelled = false;
 
-    const unsubClient = subscribeClientTopics(clientId, {
-      onJoined: () => {},
-      onError: (err) => {
-        if (isFlyingRef.current) {
-          abortPendingPlay();
-        }
-        setError(err);
-        showNotification(`Error: ${err.message}`);
-      },
-      onHandUpdate: (hu) => {
-        if (isQuadAnimatingRef.current) {
-          pendingHandUpdateRef.current = hu.cards;
-          return;
-        }
-        setHand(hu.cards);
-        if (!isFlyingRef.current) {
-          setHiddenFromHand([]);
-        }
-      },
-    });
+    const setup = async () => {
+      try {
+        const cleanup = await restoreRoomSession(clientId, roomCode, nick, () => {
+          const unsubRoom = subscribeRoomTopic(roomCode, {
+            onRoomState: (rs) => {
+              phaseRef.current = rs.phase;
+              if (rs.playEpoch !== undefined) {
+                playEpochRef.current = rs.playEpoch;
+              }
+              if (rs.phase !== 'PLAYING') {
+                resetPlayVisuals();
+              }
+              setRoomState(rs);
+              if (rs.phase === 'LOBBY') {
+                navigate('/lobby');
+              }
+            },
+            onPlayMade: handlePlayMade,
+            onRoundEnded: (re) => {
+              setPlinSplash(null);
+              const winnerNick = resolveNick(re.winnerPlayerId);
+              showNotification(`${winnerNick} abre nueva ronda`);
+              const delay = lastPlayIsAsOrosRef.current ? 1400 : 700;
+              scheduleClearPile(delay);
+              if (re.eventId && clientId) {
+                sendAck(clientId, roomCode, re.eventId);
+              }
+            },
+            onRoundReset: (rr) => {
+              if (rr.reason === 'AS_OROS') {
+                scheduleClearPile(1400);
+              } else {
+                clearPile();
+              }
+              if (rr.eventId && clientId) {
+                sendAck(clientId, roomCode, rr.eventId);
+              }
+            },
+            onQuadDiscarded: (qd) => {
+              quadQueueRef.current.push(qd);
+              if (!isQuadAnimatingRef.current) {
+                isQuadAnimatingRef.current = true;
+                startQuadDiscard(quadQueueRef.current.shift()!);
+              }
+            },
+            onGameEnded: (ge) => {
+              resetPlayVisuals();
+              setRanking(ge.ranking);
+              showNotification('¡Partida terminada!');
+            },
+            onCuloSwapRequest: () => {
+              showNotification('🍑 ¡Votación de transferencia de culo!');
+            },
+            onCuloSwapResult: (result) => {
+              if (result.accepted) {
+                showNotification('✅ Transferencia aceptada');
+              } else {
+                showNotification('❌ Transferencia rechazada');
+              }
+            },
+          });
 
-    cleanupRef.current = [unsubRoom, unsubClient];
+          const unsubClient = subscribeClientTopics(clientId, {
+            onJoined: () => {},
+            onError: (err) => {
+              if (isFlyingRef.current) {
+                abortPendingPlay();
+              }
+              setError(err);
+              showNotification(`Error: ${err.message}`);
+              if (SESSION_ERROR_CODES.has(err.code)) {
+                clearSession();
+                navigate('/');
+              }
+            },
+            onHandUpdate: (hu) => {
+              if (isQuadAnimatingRef.current) {
+                pendingHandUpdateRef.current = hu.cards;
+                return;
+              }
+              setHand(hu.cards);
+              if (!isFlyingRef.current) {
+                setHiddenFromHand([]);
+              }
+            },
+          });
+
+          return () => {
+            unsubRoom();
+            unsubClient();
+          };
+        });
+
+        if (!cancelled) {
+          cleanupRef.current = [cleanup];
+        } else {
+          cleanup();
+        }
+      } catch {
+        if (!cancelled) {
+          clearSession();
+          navigate('/');
+        }
+      }
+    };
+
+    void setup();
 
     return () => {
+      cancelled = true;
       cleanupRef.current.forEach((fn) => fn());
+      cleanupRef.current = [];
       if (clearPileTimerRef.current) {
         clearTimeout(clearPileTimerRef.current);
       }
@@ -408,10 +449,12 @@ const Game: React.FC = () => {
       }
     };
   }, [
+    hydrated,
     roomCode,
     playerId,
     clientId,
     navigate,
+    clearSession,
     setRoomState,
     setHand,
     setRanking,
@@ -432,11 +475,15 @@ const Game: React.FC = () => {
     setOrderedHand((prev) => mergeHandOrder(prev, hand));
   }, [hand, roomState?.phase]);
 
-  if (!roomState || !playerId) {
+  if (!hydrated || !roomCode || !playerId) {
+    return null;
+  }
+
+  if (!roomState) {
     return (
       <motion.div className="game-loading">
         <div className="spinner" />
-        <p>Conectando a la partida…</p>
+        <p>Reconectando a la partida…</p>
       </motion.div>
     );
   }

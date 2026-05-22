@@ -18,6 +18,7 @@ interface GameStore {
   setError: (wsError: WsError | null) => void;
   setRanking: (ranking: RankingEntry[]) => void;
   reset: () => void;
+  clearSession: () => void;
 }
 
 const generateClientId = (): string => crypto.randomUUID();
@@ -48,12 +49,23 @@ export const useGameStore = create<GameStore>()(
           lastError: null,
           ranking: null,
         }),
+      clearSession: () =>
+        set({
+          playerId: null,
+          roomCode: null,
+          roomState: null,
+          hand: [],
+          lastError: null,
+          ranking: null,
+        }),
     }),
     {
       name: 'culo-game',
       partialize: (state) => ({
         clientId: state.clientId,
         nick: state.nick,
+        roomCode: state.roomCode,
+        playerId: state.playerId,
       }),
     },
   ),
