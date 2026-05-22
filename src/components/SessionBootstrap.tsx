@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { isSessionEndedError } from '../constants/sessionErrors';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
-import { subscribeClientTopics, subscribeRoomTopic } from '../ws/stompClient';
+import { disconnectStomp, subscribeClientTopics, subscribeRoomTopic } from '../ws/stompClient';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
-
-const SESSION_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_EXPIRED', 'PLAYER_NOT_IN_ROOM']);
 
 /**
  * Si el usuario recarga en Home con sesión guardada, reconecta y redirige a lobby/game.
@@ -39,15 +38,24 @@ export function SessionBootstrap() {
               const path = rs.phase === 'LOBBY' ? '/lobby' : '/game';
               navigate(path, { replace: true });
             },
+            onRoomClosed: () => {
+              clearSession();
+              disconnectStomp();
+              setError({ code: 'CULO-ROOM-008', message: 'La sala ha sido cerrada' });
+              navigate('/', { replace: true });
+            },
           });
           const unsubClient = subscribeClientTopics(clientId, {
             onJoined: () => undefined,
             onError: (err) => {
-              setError(err);
-              if (SESSION_ERROR_CODES.has(err.code)) {
-                clearSession();
-                navigate('/', { replace: true });
+              if (!isSessionEndedError(err.code)) {
+                setError(err);
+                return;
               }
+              clearSession();
+              disconnectStomp();
+              setError(err);
+              navigate('/', { replace: true });
             },
             onHandUpdate: (hu) => setHand(hu.cards),
           });
@@ -60,6 +68,7 @@ export function SessionBootstrap() {
         const message = err instanceof Error ? err.message : 'No se pudo reconectar';
         setError({ code: 'CONNECTION', message });
         clearSession();
+        disconnectStomp();
       }
     };
 

@@ -111,6 +111,11 @@ export interface CuloSwapResult {
   accepted: boolean;
 }
 
+export interface RoomClosed {
+  reason: string;
+  message?: string;
+}
+
 export interface WsError {
   code: string;
   message: string;

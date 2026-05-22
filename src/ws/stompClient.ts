@@ -8,6 +8,7 @@ import type {
   JoinedRoom,
   PlayMade,
   QuadDiscarded,
+  RoomClosed,
   RoomState,
   RoundEnded,
   RoundReset,
@@ -119,6 +120,7 @@ export function subscribeRoomTopic(
     onGameEnded?: (gameEnded: GameEnded) => void;
     onCuloSwapRequest?: (culoSwapRequest: CuloSwapRequest) => void;
     onCuloSwapResult?: (culoSwapResult: CuloSwapResult) => void;
+    onRoomClosed?: (roomClosed: RoomClosed) => void;
   },
 ): () => void {
   const client = stompClient!;
@@ -184,6 +186,13 @@ export function subscribeRoomTopic(
       ),
     );
   }
+  if (handlers.onRoomClosed) {
+    subs.push(
+      client.subscribe(`${base}/roomClosed`, (msg) =>
+        handlers.onRoomClosed!(JSON.parse(msg.body) as RoomClosed),
+      ),
+    );
+  }
   return () => subs.forEach((s) => s.unsubscribe());
 }
 
@@ -197,6 +206,20 @@ export function sendJoinRoom(clientId: string, roomCode: string, nick: string): 
   stompClient!.publish({
     destination: '/app/room.join',
     body: JSON.stringify({ clientId, roomCode: roomCode.toUpperCase(), nick }),
+  });
+}
+
+export function sendLeaveRoom(clientId: string, roomCode: string): void {
+  stompClient!.publish({
+    destination: '/app/room.leave',
+    body: JSON.stringify({ clientId, roomCode: roomCode.toUpperCase() }),
+  });
+}
+
+export function sendCloseRoom(clientId: string, roomCode: string): void {
+  stompClient!.publish({
+    destination: '/app/room.close',
+    body: JSON.stringify({ clientId, roomCode: roomCode.toUpperCase() }),
   });
 }
 

@@ -8,8 +8,10 @@ import FlyingPlayAnimation from '../components/FlyingPlayAnimation';
 import Hand from '../components/Hand';
 import PlinSplash from '../components/PlinSplash';
 import QuadDiscardSplash from '../components/QuadDiscardSplash';
+import { GameShell } from '../components/GameShell';
 import PlayerSlot from '../components/PlayerSlot';
 import TablePile, { type TablePilePlay } from '../components/TablePile';
+import { useRoomExit } from '../hooks/useRoomExit';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
 import type { Card, GamePhase, PlayMade, QuadDiscarded } from '../types/game';
@@ -29,7 +31,6 @@ import {
 } from '../ws/stompClient';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
 
-const SESSION_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_EXPIRED', 'PLAYER_NOT_IN_ROOM']);
 import './Game.css';
 
 const RANK_LABEL: Record<string, string> = {
@@ -59,8 +60,9 @@ const PLIN_TABLE_DELAY_MS = 1000;
 const Game: React.FC = () => {
   const navigate = useNavigate();
   const hydrated = useStoreHydrated();
-  const { clientId, playerId, roomCode, roomState, hand, setRoomState, setHand, setRanking, setError, clearSession } =
+  const { clientId, playerId, roomCode, roomState, hand, setRoomState, setHand, setRanking, setError } =
     useGameStore();
+  const { handleRoomClosed, handleSessionError } = useRoomExit();
 
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
@@ -386,6 +388,7 @@ const Game: React.FC = () => {
                 showNotification('❌ Transferencia rechazada');
               }
             },
+            onRoomClosed: handleRoomClosed,
           });
 
           const unsubClient = subscribeClientTopics(clientId, {
@@ -394,12 +397,11 @@ const Game: React.FC = () => {
               if (isFlyingRef.current) {
                 abortPendingPlay();
               }
+              if (handleSessionError(err)) {
+                return;
+              }
               setError(err);
               showNotification(`Error: ${err.message}`);
-              if (SESSION_ERROR_CODES.has(err.code)) {
-                clearSession();
-                navigate('/');
-              }
             },
             onHandUpdate: (hu) => {
               if (isQuadAnimatingRef.current) {
@@ -426,7 +428,6 @@ const Game: React.FC = () => {
         }
       } catch {
         if (!cancelled) {
-          clearSession();
           navigate('/');
         }
       }
@@ -454,8 +455,9 @@ const Game: React.FC = () => {
     playerId,
     clientId,
     navigate,
-    clearSession,
     setRoomState,
+    handleRoomClosed,
+    handleSessionError,
     setHand,
     setRanking,
     setError,
@@ -481,20 +483,24 @@ const Game: React.FC = () => {
 
   if (!roomState) {
     return (
-      <motion.div className="game-loading">
-        <div className="spinner" />
-        <p>Reconectando a la partida…</p>
-      </motion.div>
+      <GameShell>
+        <motion.div className="game-loading">
+          <div className="spinner" />
+          <p>Reconectando a la partida…</p>
+        </motion.div>
+      </GameShell>
     );
   }
 
   const myPlayer = roomState.players.find((p) => p.id === playerId);
   if (!myPlayer) {
     return (
-      <div className="game-loading">
-        <div className="spinner" />
-        <p>Conectando a la partida…</p>
-      </div>
+      <GameShell>
+        <div className="game-loading">
+          <div className="spinner" />
+          <p>Conectando a la partida…</p>
+        </div>
+      </GameShell>
     );
   }
 
@@ -505,10 +511,12 @@ const Game: React.FC = () => {
       roomState.phase === 'DEALING');
   if (expectsHand && hand.length === 0) {
     return (
-      <motion.div className="game-loading">
-        <div className="spinner" />
-        <p>Sincronizando mano…</p>
-      </motion.div>
+      <GameShell>
+        <motion.div className="game-loading">
+          <div className="spinner" />
+          <p>Sincronizando mano…</p>
+        </motion.div>
+      </GameShell>
     );
   }
 
@@ -596,7 +604,7 @@ const Game: React.FC = () => {
     const otherPlayersList = roomState.players.filter((p) => p.id !== playerId);
 
     return (
-      <div className="game game--dealing">
+      <GameShell className="game game--dealing">
         <CuloSwapModal roomState={roomState} myPlayerId={playerId} onVote={handleCuloSwapVote} />
         <h2 className="game__phase-title">Fase de Reparto</h2>
         <div className="game__players-list">
@@ -635,14 +643,14 @@ const Game: React.FC = () => {
         )}
         {!canDeal && <p className="game__waiting">Esperando a que el culo reparta…</p>}
         {notification && <motion.div className="game__notification">{notification}</motion.div>}
-      </div>
+      </GameShell>
     );
   }
 
   // ─── EXCHANGE phase ────────────────────────────────────────────────────────
   if (phase === 'EXCHANGE') {
     return (
-      <div className="game game--exchange">
+      <GameShell className="game game--exchange">
         <CuloSwapModal roomState={roomState} myPlayerId={playerId} onVote={handleCuloSwapVote} />
         <ExchangePanel
           roomState={roomState}
@@ -651,22 +659,22 @@ const Game: React.FC = () => {
           onGive={handleExchangeGive}
         />
         {notification && <motion.div className="game__notification">{notification}</motion.div>}
-      </div>
+      </GameShell>
     );
   }
 
   if (phase === 'CULO_SWAP_VOTE') {
     return (
-      <div className="game">
+      <GameShell className="game">
         <CuloSwapModal roomState={roomState} myPlayerId={playerId} onVote={handleCuloSwapVote} />
         {notification && <div className="game__notification">{notification}</div>}
-      </div>
+      </GameShell>
     );
   }
 
   // ─── PLAYING phase ─────────────────────────────────────────────────────────
   return (
-    <div className="game game--playing">
+    <GameShell className="game game--playing">
       {flyingCards &&
         createPortal(
           <FlyingPlayAnimation cards={flyingCards} onComplete={handleFlyComplete} />,
@@ -779,7 +787,7 @@ const Game: React.FC = () => {
           disabled={!!flyingCards || isHandAnimatingPlay}
         />
       </div>
-    </div>
+    </GameShell>
   );
 };
 

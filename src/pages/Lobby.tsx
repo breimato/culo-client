@@ -1,12 +1,12 @@
 ﻿import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { RoomExitMenu } from '../components/RoomExitMenu';
+import { useRoomExit } from '../hooks/useRoomExit';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
 import { subscribeClientTopics, subscribeRoomTopic } from '../ws/stompClient';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
-
-const SESSION_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_EXPIRED', 'PLAYER_NOT_IN_ROOM']);
 
 export function Lobby() {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ export function Lobby() {
   const setRoomState = useGameStore((state) => state.setRoomState);
   const lastError = useGameStore((state) => state.lastError);
   const setError = useGameStore((state) => state.setError);
-  const clearSession = useGameStore((state) => state.clearSession);
+  const { handleRoomClosed, handleSessionError } = useRoomExit();
 
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -38,15 +38,17 @@ export function Lobby() {
     const setup = async () => {
       try {
         const cleanup = await restoreRoomSession(storedClientId, roomCode, nick, () => {
-          const unsubRoom = subscribeRoomTopic(roomCode, { onRoomState: setRoomState });
+          const unsubRoom = subscribeRoomTopic(roomCode, {
+            onRoomState: setRoomState,
+            onRoomClosed: handleRoomClosed,
+          });
           const unsubClient = subscribeClientTopics(storedClientId, {
             onJoined: () => undefined,
             onError: (err) => {
-              setError(err);
-              if (SESSION_ERROR_CODES.has(err.code)) {
-                clearSession();
-                navigate('/');
+              if (handleSessionError(err)) {
+                return;
               }
+              setError(err);
             },
           });
           return () => {
@@ -83,6 +85,7 @@ export function Lobby() {
   if (connecting || !roomState) {
     return (
       <div className="page lobby-page">
+        <RoomExitMenu />
         <p style={{ color: 'var(--cream-muted)', textAlign: 'center' }}>
           Reconectando…
         </p>
@@ -116,6 +119,7 @@ export function Lobby() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
+      <RoomExitMenu />
       <div className="card-panel lobby-card">
         <h1>Lobby</h1>
 
