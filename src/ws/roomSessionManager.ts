@@ -43,20 +43,24 @@ export type RoomSessionHandlers = {
   client?: ClientTopicHandlers;
 };
 
-let refCount = 0;
+type Registration = {
+  room: RoomTopicHandlers;
+  client: ClientTopicHandlers;
+};
+
+let nextRegistrationId = 0;
+const registrations = new Map<number, Registration>();
+
 let sessionKey = '';
 let teardown: (() => void) | null = null;
 let connectPromise: Promise<void> | null = null;
-
-const roomHandlers: RoomTopicHandlers[] = [];
-const clientHandlers: ClientTopicHandlers[] = [];
 
 function dispatchRoom<K extends keyof RoomTopicHandlers>(
   key: K,
   payload: Parameters<NonNullable<RoomTopicHandlers[K]>>[0],
 ): void {
-  for (const handlers of roomHandlers) {
-    const handler = handlers[key];
+  for (const { room } of registrations.values()) {
+    const handler = room[key];
     if (handler) {
       (handler as (arg: typeof payload) => void)(payload);
     }
@@ -67,8 +71,8 @@ function dispatchClient<K extends keyof ClientTopicHandlers>(
   key: K,
   payload: Parameters<NonNullable<ClientTopicHandlers[K]>>[0],
 ): void {
-  for (const handlers of clientHandlers) {
-    const handler = handlers[key];
+  for (const { client } of registrations.values()) {
+    const handler = client[key];
     if (handler) {
       (handler as (arg: typeof payload) => void)(payload);
     }
@@ -77,11 +81,11 @@ function dispatchClient<K extends keyof ClientTopicHandlers>(
 
 function handleHandUpdate(handUpdate: HandUpdate): void {
   let handled = false;
-  for (const handlers of clientHandlers) {
-    if (!handlers.onHandUpdate) {
+  for (const { client } of registrations.values()) {
+    if (!client.onHandUpdate) {
       continue;
     }
-    handlers.onHandUpdate(handUpdate);
+    client.onHandUpdate(handUpdate);
     handled = true;
   }
   if (!handled) {
@@ -139,9 +143,17 @@ async function ensureConnected(
   await connectPromise;
 }
 
+/** Re-solicita join + handUpdate si la sesión STOMP ya está activa. */
+export function requestRoomResync(clientId: string, roomCode: string, nick: string): void {
+  if (!teardown || sessionKey !== `${clientId}:${roomCode}`) {
+    return;
+  }
+  sendJoinRoom(clientId, roomCode, nick);
+}
+
 /**
  * Mantiene suscripciones STOMP mientras haya pantallas de sala activas (lobby/game).
- * Evita que al cambiar de ruta se desmonten los topics y se pierda handUpdate.
+ * Cada acquire tiene su propio id; al liberar solo se quitan sus handlers (no el último push).
  */
 export async function acquireRoomSession(
   clientId: string,
@@ -149,9 +161,11 @@ export async function acquireRoomSession(
   nick: string,
   handlers: RoomSessionHandlers,
 ): Promise<() => void> {
-  roomHandlers.push(handlers.room ?? {});
-  clientHandlers.push(handlers.client ?? {});
-  refCount++;
+  const registrationId = ++nextRegistrationId;
+  registrations.set(registrationId, {
+    room: handlers.room ?? {},
+    client: handlers.client ?? {},
+  });
 
   await ensureConnected(clientId, roomCode, nick);
 
@@ -161,10 +175,8 @@ export async function acquireRoomSession(
       return;
     }
     released = true;
-    refCount = Math.max(0, refCount - 1);
-    roomHandlers.pop();
-    clientHandlers.pop();
-    if (refCount === 0 && teardown) {
+    registrations.delete(registrationId);
+    if (registrations.size === 0 && teardown) {
       teardown();
       teardown = null;
       sessionKey = '';
@@ -174,9 +186,7 @@ export async function acquireRoomSession(
 }
 
 export function resetRoomSession(): void {
-  refCount = 0;
-  roomHandlers.length = 0;
-  clientHandlers.length = 0;
+  registrations.clear();
   if (teardown) {
     teardown();
     teardown = null;

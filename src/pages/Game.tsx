@@ -27,6 +27,7 @@ import {
   sendPass,
   sendPlayCards,
 } from '../ws/stompClient';
+import { requestRoomResync } from '../ws/roomSessionManager';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
 
 import './Game.css';
@@ -468,6 +469,33 @@ const Game: React.FC = () => {
     }
     setOrderedHand((prev) => mergeHandOrder(prev, hand));
   }, [hand, roomState?.phase]);
+
+  useEffect(() => {
+    if (!roomCode || !playerId || !clientId || !roomState) {
+      return;
+    }
+
+    const my = roomState.players.find((p) => p.id === playerId);
+    if (!my || my.cardCount === 0) {
+      return;
+    }
+
+    const phase = roomState.phase;
+    if (phase !== 'PLAYING' && phase !== 'EXCHANGE') {
+      return;
+    }
+
+    if (hand.length >= my.cardCount) {
+      return;
+    }
+
+    const { nick } = useGameStore.getState();
+    const timer = window.setTimeout(() => {
+      requestRoomResync(clientId, roomCode, nick);
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [roomCode, playerId, clientId, roomState, hand.length]);
 
   if (!hydrated || !roomCode || !playerId) {
     return null;
