@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isSessionEndedError } from '../constants/sessionErrors';
 import { useGameStore } from '../store/gameStore';
 import type { RoomClosed, WsError } from '../types/game';
+import { resetRoomSession } from '../ws/roomSessionManager';
 import { disconnectStomp, sendCloseRoom, sendLeaveRoom } from '../ws/stompClient';
 
 export function useRoomExit() {
@@ -12,6 +13,7 @@ export function useRoomExit() {
 
   const exitToHome = useCallback(
     (message?: string) => {
+      resetRoomSession();
       clearSession();
       disconnectStomp();
       if (message) {
@@ -60,6 +62,7 @@ export function useRoomExit() {
       if (!isSessionEndedError(wsError.code)) {
         return false;
       }
+      resetRoomSession();
       clearSession();
       setError(wsError);
       navigate('/', { replace: true });

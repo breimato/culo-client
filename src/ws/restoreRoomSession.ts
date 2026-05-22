@@ -1,41 +1,14 @@
-import {
-  connectStomp,
-  sendJoinRoom,
-} from './stompClient';
-
-let restoreInFlight: Promise<() => void> | null = null;
-let restoreKey = '';
+import type { RoomSessionHandlers } from './roomSessionManager';
+import { acquireRoomSession } from './roomSessionManager';
 
 /**
- * Conecta STOMP, ejecuta setup de suscripciones y re-envía join con el mismo clientId.
- * Deduplica llamadas concurrentes (Bootstrap + Lobby/Game en la misma carga).
+ * Conecta STOMP, registra handlers y re-envía join con el mismo clientId.
  */
 export async function restoreRoomSession(
   clientId: string,
   roomCode: string,
   nick: string,
-  setupSubscriptions: () => () => void,
+  handlers: RoomSessionHandlers,
 ): Promise<() => void> {
-  const key = `${clientId}:${roomCode}`;
-  if (restoreInFlight && restoreKey === key) {
-    return restoreInFlight;
-  }
-
-  restoreKey = key;
-  restoreInFlight = (async () => {
-    let pageCleanup: (() => void) | undefined;
-
-    await connectStomp(() => {
-      pageCleanup = setupSubscriptions();
-      sendJoinRoom(clientId, roomCode, nick);
-    });
-
-    return () => pageCleanup?.();
-  })();
-
-  try {
-    return await restoreInFlight;
-  } finally {
-    restoreInFlight = null;
-  }
+  return acquireRoomSession(clientId, roomCode, nick, handlers);
 }

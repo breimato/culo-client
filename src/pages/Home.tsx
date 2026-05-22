@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
+import type { HandUpdate, JoinedRoom, WsError } from '../types/game';
 
 export function Home() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export function Home() {
   const setNick = useGameStore((state) => state.setNick);
   const setJoined = useGameStore((state) => state.setJoined);
   const setRoomState = useGameStore((state) => state.setRoomState);
+  const setHand = useGameStore((state) => state.setHand);
   const setError = useGameStore((state) => state.setError);
   const lastError = useGameStore((state) => state.lastError);
 
@@ -22,7 +24,7 @@ export function Home() {
     navigate('/lobby');
   };
 
-  const connectAndAct = async (sendMsg: () => void) => {
+  const connectFromHome = async (sendMsg: () => void) => {
     if (!nick.trim()) {
       setError({ code: 'CLIENT', message: 'Introduce un nick' });
       return;
@@ -30,21 +32,19 @@ export function Home() {
     setError(null);
     setLoading(true);
     try {
-      const {
-        connectStomp,
-        subscribeClientTopics,
-        subscribeRoomTopic,
-      } = await import('../ws/stompClient');
+      const { connectStomp, disconnectStomp, subscribeClientTopics, subscribeRoomTopic } =
+        await import('../ws/stompClient');
 
       await connectStomp(() => {
-        // subscriptions must happen here, inside onConnect
         const unsubClient = subscribeClientTopics(clientId, {
-          onJoined: (joinedRoom) => {
+          onJoined: (joinedRoom: JoinedRoom) => {
+            unsubClient();
             subscribeRoomTopic(joinedRoom.roomCode, { onRoomState: setRoomState });
             handleJoined(joinedRoom.roomCode, joinedRoom.playerId);
-            unsubClient();
+            disconnectStomp();
           },
-          onError: (wsError) => {
+          onHandUpdate: (hu: HandUpdate) => setHand(hu.cards),
+          onError: (wsError: WsError) => {
             setError(wsError);
             setLoading(false);
             unsubClient();
@@ -61,7 +61,7 @@ export function Home() {
   };
 
   const onCreateRoom = () => {
-    void connectAndAct(() => {
+    void connectFromHome(() => {
       void import('../ws/stompClient').then(({ sendCreateRoom }) =>
         sendCreateRoom(clientId, nick.trim()),
       );
@@ -74,7 +74,7 @@ export function Home() {
       setError({ code: 'CLIENT', message: 'El código debe tener 4 caracteres' });
       return;
     }
-    void connectAndAct(() => {
+    void connectFromHome(() => {
       void import('../ws/stompClient').then(({ sendJoinRoom }) =>
         sendJoinRoom(clientId, roomCode, nick.trim()),
       );

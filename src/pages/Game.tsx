@@ -26,8 +26,6 @@ import {
   sendExchangeGive,
   sendPass,
   sendPlayCards,
-  subscribeClientTopics,
-  subscribeRoomTopic,
 } from '../ws/stompClient';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
 
@@ -330,8 +328,8 @@ const Game: React.FC = () => {
 
     const setup = async () => {
       try {
-        const cleanup = await restoreRoomSession(clientId, roomCode, nick, () => {
-          const unsubRoom = subscribeRoomTopic(roomCode, {
+        const cleanup = await restoreRoomSession(clientId, roomCode, nick, {
+          room: {
             onRoomState: (rs) => {
               phaseRef.current = rs.phase;
               if (rs.playEpoch !== undefined) {
@@ -389,9 +387,8 @@ const Game: React.FC = () => {
               }
             },
             onRoomClosed: handleRoomClosed,
-          });
-
-          const unsubClient = subscribeClientTopics(clientId, {
+          },
+          client: {
             onJoined: () => {},
             onError: (err) => {
               if (isFlyingRef.current) {
@@ -413,12 +410,7 @@ const Game: React.FC = () => {
                 setHiddenFromHand([]);
               }
             },
-          });
-
-          return () => {
-            unsubRoom();
-            unsubClient();
-          };
+          },
         });
 
         if (!cancelled) {
@@ -504,12 +496,11 @@ const Game: React.FC = () => {
     );
   }
 
-  const expectsHand =
+  const needsHandSync =
     myPlayer.cardCount > 0 &&
-    (roomState.phase === 'PLAYING' ||
-      roomState.phase === 'EXCHANGE' ||
-      roomState.phase === 'DEALING');
-  if (expectsHand && hand.length === 0) {
+    hand.length < myPlayer.cardCount &&
+    (roomState.phase === 'PLAYING' || roomState.phase === 'EXCHANGE');
+  if (needsHandSync) {
     return (
       <GameShell>
         <motion.div className="game-loading">

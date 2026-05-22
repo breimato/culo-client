@@ -5,7 +5,6 @@ import { RoomExitMenu } from '../components/RoomExitMenu';
 import { useRoomExit } from '../hooks/useRoomExit';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useGameStore } from '../store/gameStore';
-import { subscribeClientTopics, subscribeRoomTopic } from '../ws/stompClient';
 import { restoreRoomSession } from '../ws/restoreRoomSession';
 
 export function Lobby() {
@@ -37,12 +36,12 @@ export function Lobby() {
 
     const setup = async () => {
       try {
-        const cleanup = await restoreRoomSession(storedClientId, roomCode, nick, () => {
-          const unsubRoom = subscribeRoomTopic(roomCode, {
+        const cleanup = await restoreRoomSession(storedClientId, roomCode, nick, {
+          room: {
             onRoomState: setRoomState,
             onRoomClosed: handleRoomClosed,
-          });
-          const unsubClient = subscribeClientTopics(storedClientId, {
+          },
+          client: {
             onJoined: () => undefined,
             onError: (err) => {
               if (handleSessionError(err)) {
@@ -50,11 +49,7 @@ export function Lobby() {
               }
               setError(err);
             },
-          });
-          return () => {
-            unsubRoom();
-            unsubClient();
-          };
+          },
         });
         restoreCleanupRef.current = cleanup;
       } catch (err) {
